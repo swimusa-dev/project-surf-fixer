@@ -368,7 +368,7 @@ Rules for the card: plain language, every change listed (no "and 4 more"), dates
 ### 8.3 Contractor end dates
 
 - **Capture:** Contract End Date is required on the contractor form (4.3). Fixer rejects an end date more than 12 months out **[ASSUMPTION]**.
-- **Enforcement:** at onboarding, Fixer writes a **scheduled offboarding** to Fixer Requests for the end date and sets AD `accountExpires` as a backstop. At end minus 10 business days, Fixer comments to the sponsor and creates the offboarding request so approvals happen before the date. At end minus 2 business days, it escalates if neither an extension nor approval exists.
+- **Enforcement:** at onboarding, Fixer writes a **scheduled offboarding** to Fixer Requests for the end date and sets AD `accountExpires` for on-premises logon only; it is **not** a cloud backstop, because password hash sync ignores it [V]. At end minus 10 business days, Fixer comments to the sponsor and creates the offboarding request so approvals happen before the date. At end minus 2 business days, it escalates if neither an extension nor approval exists.
 - **Missing end date** (including today's 17 contractors with none [OBS]): onboarding stays in "Needs Info". For existing contractors, a one-time backfill: Fixer lists active contractor accounts and asks each sponsor for an end date.
 - **Extended:** sponsor submits an extension (a short "Contractor Extension" form **[ASSUMPTION]**, or edits the date on the original task); Fixer requests sponsor plus IT approval, then updates the schedule and `accountExpires`.
 - **Shortened:** becomes the new offboarding time; same re-approval logic as a cutoff moved earlier (no new approval required).
