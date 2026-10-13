@@ -1,0 +1,169 @@
+{
+  "$comment": "ClickUp identifiers Fixer depends on. Observed 2026-10-13 from the Swim USA workspace. Field IDs are stable; names can be edited by list admins, so code must key on IDs.",
+  "workspace_id": "9009038794",
+  "space": { "id": "90090075731", "name": "IT" },
+  "lists": {
+    "onboarding": {
+      "id": "901100618258",
+      "name": "📋 New Hire IT Onboarding Form",
+      "statuses": {
+        "to do": "sc901100618258_doPgtLzf",
+        "in progress": "sc901100618258_rvg7aOh9",
+        "awaiting user reponse": "sc901100618258_cJRDCzIt",
+        "done - awaiting user": "sc901100618258_S92x0lLy",
+        "complete": "sc901100618258_EpAnAKOc"
+      },
+      "fields": {
+        "new_hire_name": { "id": "83944a71-5ee1-4aba-b148-b7ec6d5b0e35", "name": "New Hire Name", "type": "text", "note": "Usually empty; task name carries the person's name" },
+        "new_contractor_names": { "id": "e3ad508a-36a1-42ae-a996-2448dd5e5627", "name": "New Contractor(s) Name(s)", "type": "text", "note": "Populated only by the contractor form; may list several people" },
+        "country_office": { "id": "17d6995f-5a8d-4d2c-8021-572bcc837117", "name": "Country Office Located In", "type": "short_text", "note": "Contractor form only" },
+        "employee_title": { "id": "1e62fc64-b70c-4f84-b875-fb665b15483f", "name": "Employee Title", "type": "short_text" },
+        "supervisor_name": { "id": "1b42979a-b4e3-43f0-a4d5-0a0af1bc53da", "name": "Supervisor's Name", "type": "short_text" },
+        "supervisor_email": { "id": "3760b54d-7424-4e35-9e73-283efab6b143", "name": "Supervisor's Email", "type": "email" },
+        "start_date_time": { "id": "bd810cd3-f573-4235-807b-d34868ae5475", "name": "Start Date and Time", "type": "date" },
+        "location": { "id": "1a33a1c8-8ae9-4aef-85a7-f74485551c13", "name": "Location", "type": "drop_down" },
+        "office_locations": { "id": "bb5275e6-432b-4b41-bcc8-781eb38a4c5f", "name": "Office Locations", "type": "drop_down", "note": "Second location field; one of the two should be retired" },
+        "divisions_access": { "id": "7462d02d-b04d-4b6e-a730-095dc3dc8454", "name": "Division(s) Access", "type": "labels" },
+        "divisions_brands_needed_text": { "id": "d22c78c4-4904-4c72-b4f3-d2ebe9a289d1", "name": "Divisions/Brands Needed", "type": "short_text", "note": "Free-text duplicate of Division(s) Access; LLM-normalized, suggestions only" },
+        "cft_distro": { "id": "c295c056-ac7c-4bd3-85fd-262f37696693", "name": "CFT Distro Groups needed(Type N/A if not needed)", "type": "text" },
+        "pdc_distro": { "id": "4ab34b2d-7687-4781-a09e-c0f49b19c3ed", "name": "PDC Distro Groups Needed(Type N/A if not needed)", "type": "text" },
+        "costing_tp_distro": { "id": "61e805da-c9ee-433f-abba-554ab0383bab", "name": "Costing TP Request Distro Groups needed(Type N/A if not needed)", "type": "text" },
+        "apps": { "id": "a01b1025-f636-4603-8c9a-2bbaac99660a", "name": "All employees automatically receive Microsoft365, Teams, OneDrive.", "type": "labels" },
+        "nuorder_needed": { "id": "265db002-d8c1-4c80-ad28-fb2e5a49ebee", "name": "NuOrder Access Needed", "type": "checkbox" },
+        "nuorder_portals": { "id": "9a1c8572-1c4d-408b-b67f-cc056a372d83", "name": "Portal(s)", "type": "labels" },
+        "qlik_needed": { "id": "cef12126-67c6-4e61-8995-41678560e4de", "name": "Qlik Access Needed", "type": "checkbox" },
+        "yplm_needed": { "id": "f66454b4-edea-47ca-962d-e638f13559fa", "name": "YPLM Access Needed", "type": "checkbox" },
+        "yplm_needed_text": { "id": "6ecf7891-81e8-44fb-8813-778271b4f8cf", "name": "YPLM Access Needed (Type N/A if not needed)", "type": "short_text", "note": "Legacy free-text twin of the checkbox" },
+        "yplm_primary_role": { "id": "55a6fbfa-cc8f-46c6-980c-7fe36325340c", "name": "Primary YPLM Role", "type": "drop_down" },
+        "yplm_comments": { "id": "cbd6acb2-2441-40a6-9558-59b028269de3", "name": "YPLM Additional Comments", "type": "text" },
+        "print_library": { "id": "a8a6e9a7-e718-44ac-80ac-07787ad9aec3", "name": "Need Print Library Access", "type": "checkbox" },
+        "plm_request_types": { "id": "2a5af8a3-c201-4d66-a409-7df9229afd53", "name": "PLM Request Types", "type": "labels" },
+        "accumark_needed": { "id": "f86653b8-2666-4437-960a-e066da9d4f0f", "name": "Accumark Access Needed?", "type": "drop_down" },
+        "new_headcount": { "id": "1f6facab-d27a-424d-8e15-0acbd04ac6af", "name": "New Headcount?", "type": "drop_down" },
+        "replacing_existing_user": { "id": "a083c146-1034-47fb-9c03-e7f35dc4ca51", "name": "Replacing Existing User?", "type": "short_text" },
+        "existing_employee_to_copy": { "id": "4fd1097a-849b-48fa-b510-651237ed4ac9", "name": "Existing Employee to Copy", "type": "short_text" },
+        "primary_language": { "id": "53ee59da-dfb3-4eac-9430-73a53f0b229e", "name": "Primary Language", "type": "drop_down" },
+        "ship_via_ups_dhl": { "id": "5e98e8bc-94da-4f52-8419-8d76bc16618f", "name": "Employee Need Ability to Ship Via UPS/DHL", "type": "checkbox" },
+        "base_hardware": { "id": "0aa697c9-4007-40ac-ad6c-8a8917fe8a35", "name": "CHOOSE BASE HARDWARE", "type": "labels" },
+        "additional_equipment": { "id": "edafcbec-bc79-4c8e-b241-ad3586098250", "name": "Additional Equipment", "type": "labels" },
+        "need_to_ship": { "id": "8430b100-30ef-45b3-9cc2-92f91bdf57ba", "name": "Need to Ship Anything to Employee?", "type": "drop_down" },
+        "shipping_address": { "id": "e0d357cf-1016-4f52-919f-f9e7bad5e839", "name": "Shipping Address", "type": "location" },
+        "additional_information": { "id": "3faf8d52-da58-4357-9620-257977758cec", "name": "Any Additional Information", "type": "text" },
+        "allocation_email": { "id": "f752eb0c-be1e-44ed-b34d-a798752abc02", "name": "Allocation Email", "type": "email", "note": "Shared with the offboarding list; purpose unknown, not used by Fixer" }
+      },
+      "option_ids": {
+        "apps": {
+          "BlueCherry Infinity (includes Remote Desktop)": "3e952f8f-1053-4b39-ac04-51e7223f71b1",
+          "VPN Remote Access for Fileshares": "0a8e9201-18a5-4cb4-a47a-6ac1a8573149",
+          "Specific File Shares / Network Drives": "56fe35b1-c563-4287-b1f7-bc5f2ade6d84",
+          "FileCloud": "be5b95b7-10c6-4ea4-a6a4-37c3fae12de4",
+          "ClickUp": "9b29145a-436d-42b4-8b43-8c62ac362869",
+          "Adobe Photoshop": "58045613-be67-4364-9dcb-17ceaa8b2387",
+          "Adobe Illustrator": "1154cbbd-cd07-401e-9fec-6623e72059fd",
+          "Adobe InDesign": "5a61391e-1192-4ece-bcd9-43e09fadd1ab",
+          "Adobe Acrobat": "c52ae540-9b74-460e-9c7d-06855ed4d264",
+          "Adobe AllApps": "afc4797d-375f-4e30-a842-90872aae9075",
+          "Zoom": "c5faa3c8-fa08-43be-98da-be834752ddb4",
+          "Dropbox": "3506fdbc-bef7-4e19-9aa8-6a44548dbf82",
+          "AccuMark Pattern Design": "797c9cf1-1915-4366-b325-0c5e9838077d",
+          "AccuMark Marker Making": "39f3d4f0-c31f-49dd-91e4-3d016e16e2ae",
+          "Gerber Direct Access Browser plug-in": "4e17cc63-bc93-41de-82f8-b851be2ecc20",
+          "Google Chrome": "ec5dd7fa-b22e-44bb-825a-ae81cd123384",
+          "Not Needed at this time": "5bb561f6-a5e0-48e3-8e48-3dcfb407caab"
+        },
+        "divisions_access": {
+          "BF (Backflips)": "f6d1ae71-8f5b-490c-9988-06cdb26ce546",
+          "LB (Longevity Brands)": "30ca01a1-639f-4c32-8d99-b7bb27cdf3a9",
+          "MG (Magicsuit by @Sea)": "08c18836-0bbc-4a20-8c13-e98a7ea8a295",
+          "MI (Mainstream International)": "ff7ae234-9d9a-4ec7-acb3-77a22cee89e4",
+          "SP (Mainstream Special)": "6c59b3e2-a11b-48b2-ae05-c6d5a4430e69",
+          "MS (Mainstream Swimsuits)": "0cd2948a-1b80-4c42-8d1c-9ef2a60ecbbc",
+          "SS (Miraclesuite by Swim Shaper)": "fde42072-a494-4002-923a-e73265f78dd1",
+          "PB (Penbrooke Swimsuits)": "7fe72134-6ba5-478f-9bf9-c7871b6a1cfd",
+          "RL (Ralph Lauren)": "7183fb3b-fd79-4c36-92bc-c8aec5cd3dec",
+          "VA (Vitamin A)": "3165a98e-29c0-43fc-a231-7ad43b0d3aa0"
+        },
+        "new_headcount": {
+          "No - Use Replacement License": "867ac018-7533-4c8f-84d6-26a716484e6f",
+          "Yes - New license needs to be purchased": "57ec9d24-d241-4327-95b7-100a3f1f11bb"
+        },
+        "primary_language": {
+          "United States (english)": "3a0795de-fe70-4964-a9c9-51760e11a446",
+          "Chinese (simplifed)": "191f8ea2-81dd-4c1d-a589-ce1cffac908a",
+          "Chinese (traditional)": "0a1757f2-7db2-4299-9d3e-7054d644115c",
+          "French": "19a52ebe-258f-4ce8-8997-812669087ea6",
+          "Italian": "fd971f3f-6f58-468b-9c00-55b362bf3d1f",
+          "Turkish": "25a14700-8934-4574-a425-10c42660b3a0"
+        },
+        "yplm_primary_role": {
+          "Artwork Team": "8b6feb45-306b-4cfd-9fdd-69f46bd5639d",
+          "Raw Materials Team": "cea2a6da-c92a-4b80-83c2-63eb58b8f8a7",
+          "Design Team": "cd813ed7-36bf-40a7-bba2-1230f376b472",
+          "Tech Design Team": "7408c05a-bda5-4df9-b36c-0c9c63166f2a",
+          "Product Managers": "2ca133e5-ac5c-436c-a42e-73b218d2f6c9",
+          "Read Only": "c30e1086-ce25-44d5-95db-29815662dc05",
+          "Partner Phase 1~3": "0c621e3a-76ca-475b-aa0b-85d2281e84f4",
+          "Partner Phase 4": "0f23196d-6a35-4710-8841-055d564434df",
+          "Print Library User Only": "64d7edb9-fb15-42db-8033-7e7e39f0cd04"
+        },
+        "location": {
+          "24 Franklin": "cf6c9edd-a3bd-48a4-ab91-1b82fcadb611",
+          "250 NYC": "bdc2bc5f-7cdd-470a-b909-6f20c953023f",
+          "260 NYC": "d827fa12-9cbf-4583-bf4d-4e13d0b4268f",
+          "3001 Emrick": "ed512813-21dd-429e-9726-ed11e7ea37f6",
+          "50 Sycamore": "f432b668-42cc-44fc-9a3c-47151848d871",
+          "LACD": "d2de7b85-b168-4b15-93dc-4fabca410f09",
+          "Remote Teleworker (provide address)": "47b017dd-1dbb-42d8-a754-54ac5f956817",
+          "Vitamin A Warehouse": "3579ecee-030d-4a73-acc5-986647c3e64e",
+          "Vitamina A Office": "2ab2a917-2da9-4525-98d4-3dd33837c55f"
+        }
+      }
+    },
+    "offboarding": {
+      "id": "901100622311",
+      "name": "📋 Employee IT Offboarding Form",
+      "statuses": {
+        "to do": "sc901100622311_vepENlDf",
+        "in progress": "sc901100622311_flNXEzvL",
+        "processed": "sc901100622311_LNre6J2F",
+        "awaiting equipment return": "sc901100622311_YkHjSzgD",
+        "1st email sent for return": "sc901100622311_6mH3YipA",
+        "2nd email sent for return": "sc901100622311_jFd6RB81",
+        "escalated to upper mgmt": "sc901100622311_22DTpe2E",
+        "equipment received": "sc901100622311_Ezyw6e6w",
+        "complete": "sc901100622311_QprXR4rj"
+      },
+      "fields": {
+        "employee_name": { "id": "b8535219-fd5a-4536-814d-c62b55402cf1", "name": "Employee Name", "type": "short_text", "note": "Display only, never the identifier" },
+        "employee_company_email": { "id": "a85117a9-5e73-43e2-9c92-0c49a3cca4c5", "name": "Employee Company Email", "type": "short_text", "note": "PRIMARY KEY. Plain text, not an email-typed field: validate format and domain before lookup" },
+        "requestor_email": { "id": "36109fcb-8e7b-4c47-b3e7-c2f068026e6c", "name": "Requestor Email", "type": "email" },
+        "termination_datetime": { "id": "dbb44014-cef5-4daf-9dbc-c0c56ccc03f8", "name": "Date & Time of Termination (EST)", "type": "date", "note": "executeAt for containment; ClickUp stores unix ms UTC" },
+        "supervisor_name": { "id": "3e5f9bbd-c134-4d0f-86e1-0aa7dd3e5816", "name": "Supervisor Name", "type": "short_text" },
+        "supervisor_email": { "id": "21e46ead-8534-4942-87a2-9405a40e81af", "name": "Supervisor Company Email", "type": "email" },
+        "auto_reply": { "id": "532ee868-7ee3-465e-a012-04a74c8f8398", "name": "Automatic (Out of Office) Reply Message", "type": "short_text" },
+        "forward_email_to": { "id": "4d981ed0-2d80-4d30-9e59-a5215b841599", "name": "Forward Email To:", "type": "short_text" },
+        "grant_mailbox_access_to": { "id": "a9b9b8a3-2cb4-426e-aa92-0b0db6fa7e12", "name": "Grant Mailbox Access To:", "type": "short_text" },
+        "transfer_files_to": { "id": "12640cef-48b8-4071-a50f-a500d82df63e", "name": "Transfer Files To:", "type": "short_text" },
+        "employee_location": { "id": "f4f73b9b-2791-47d2-b83d-3af4c8cb55bc", "name": "Employee Location", "type": "labels" },
+        "equipment_mailing_address": { "id": "d5b5f82a-aae6-4fbe-9b61-a399632167cd", "name": "Mailing Address for Equipment Retrieval", "type": "short_text" },
+        "specific_instructions": { "id": "9128c312-a8b1-4967-b122-8099baa7dca0", "name": "Specific Instructions", "type": "text" },
+        "first_email_sent": { "id": "47e7363e-b27e-45df-9e14-94ca6977ea9c", "name": "1st Email Notification Sent", "type": "date", "note": "Equipment-return process, humans only" },
+        "second_email_sent": { "id": "1a2c2bf4-2571-4ef6-b51d-3cf5447eb1a0", "name": "2nd Email Notification Sent", "type": "date", "note": "Equipment-return process, humans only" },
+        "date_box_sent": { "id": "dcc6e9d6-6372-49cc-b85d-554164902edb", "name": "Date Box Sent", "type": "date", "note": "Equipment-return process, humans only" }
+      }
+    }
+  },
+  "shared_fields_not_used_by_fixer": [
+    { "id": "0d4a7dda-728f-4c47-8240-d2dce1b3939f", "name": "Project Phase" },
+    { "id": "299936de-8bf4-4f8b-ae9b-427454b12d17", "name": "Team Members" },
+    { "id": "9c1d975f-72e5-446a-ad04-b4567ff09938", "name": "Business Owner(s)" },
+    { "id": "3ff80cdb-27de-4446-acab-acc33be2dc60", "name": "Vendor SLA Resolution Target Date" },
+    { "id": "f752eb0c-be1e-44ed-b34d-a798752abc02", "name": "Allocation Email" }
+  ],
+  "fields_to_add": {
+    "$comment": "Fill in IDs after the fields are created in ClickUp (Phase 0). Definitions are in docs/phase-0-build-spec.md section 2.",
+    "both_lists": ["Fixer Request ID", "Fixer State", "Worker Type (resolved)", "Approval Status", "Scheduled Execution", "Fixer Summary"],
+    "onboarding": ["Worker Type", "Contract End Date", "Sponsor Email", "Contracting Company", "Additional Apps", "Credential Delivery Contact"],
+    "offboarding": ["Worker Type", "Urgency", "Confidential", "Mailbox Retention"]
+  }
+}
