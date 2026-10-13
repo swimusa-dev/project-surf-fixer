@@ -1,8 +1,8 @@
 # Fixer: Onboarding and Offboarding Workflow Design
-**Surf Crew / Fixer** | Draft v0.1 | October 13, 2026 | Owner of this doc: Dave Christy
-**Status:** design draft. Items marked **[ASSUMPTION]** or listed in section 14 need your answer before build.
+**Surf Crew / Fixer** | Draft v0.2 | October 13, 2026 | Owner of this doc: Dave Christy
+**Status:** design draft. Items marked **[ASSUMPTION]** or listed in section 14 need your answer before build. v0.2 adds the verification appendix (section 15) and corrects the lines it overturned; the build-level detail lives in [Phase 0 Build Specification](phase-0-build-spec.md).
 
-**Confidence key.** **[V]** checked this session against official vendor documentation (one source each, which is below your three-source bar; see Sources). **[U]** my working knowledge, not verified; each has a "how to verify" note. **[OBS]** observed directly in your ClickUp workspace today.
+**Confidence key.** **[V]** checked against official vendor documentation (learn.microsoft.com, developer.clickup.com, help.clickup.com); the appendix gives the page count per claim, which is the honest measure against your three-source bar since vendor behavior has one authoritative publisher. **[U]** my working knowledge, not verified; each has a "how to verify" note. **[OBS]** observed directly in your ClickUp workspace today. **[V, corrected]** a v0.1 claim the verification overturned.
 
 ---
 
@@ -90,14 +90,14 @@ flowchart TB
 - Register **one ClickUp webhook** (API) scoped to the two lists (or two webhooks, one per list) for `taskCreated` and `taskUpdated`, pointing at a Power Automate flow with the "When an HTTP request is received" trigger.
 - The flow verifies the **`X-Signature` header**, an HMAC-SHA256 of the raw body using the webhook secret, hex encoded [V]. Reject anything that fails.
 - **One workflow, shared downstream logic.** The webhook payload carries the task ID; Fixer immediately calls the ClickUp API to get the full task. The **list ID** says onboarding (`901100618258`) or offboarding (`901100622311`) [OBS]. Two entry points would duplicate validation, idempotency, and logging for no gain.
-- **Reconciliation sweep (required, not optional).** A scheduled flow every 15 minutes lists tasks created or updated in both lists in the last 24 hours and processes any without a Fixer Request ID. This covers missed or failed webhook deliveries. ClickUp's webhook signature page does not document retry or delivery guarantees; it links a separate "webhook health" page I did not verify [U]. **Verify:** read ClickUp's webhook health documentation and test by disabling the flow for 10 minutes, submitting a test form, and confirming the sweep catches it.
+- **Reconciliation sweep (required, not optional).** A scheduled flow every 15 minutes lists tasks created or updated in both lists in the last 24 hours and processes any without a Fixer Request ID. This covers missed or failed webhook deliveries. ClickUp retries a failed event up to five times, counts the endpoint as failed on any non-success status or a response slower than 7 seconds, and **silently suspends the webhook at 100 failures** [V]. The sweep therefore also reads webhook health on each run and re-activates a suspended webhook (spec section 3). **Test:** disable the flow for 10 minutes, submit a test form, and confirm the sweep catches it.
 - **Race guard:** wait 60 seconds after `taskCreated` before reading the task, then read it once more if any required field is empty, in case form fields land after creation [U]. **Verify:** submit test forms and compare the webhook timestamp to the field values returned.
 
 ### 3.2 Why not the alternatives
 
 | Option | Verdict | Reason |
 |---|---|---|
-| Native ClickUp Automation ("when task created, call webhook") | Fallback only | Fewer controls than an API webhook: I have not verified it signs requests, and it depends on your plan [U]. **Verify:** check whether your plan's Automations include a webhook action and whether it sends a signature. |
+| Native ClickUp Automation ("when task created, call webhook") | No | Requests are **not signed**; the only protection is a custom header you set, and the action needs Business or above [V]. Not acceptable as the trigger for a privileged workflow. |
 | ClickUp SuperAgent as the Fixer | Not for decisions or execution | Session 1 found no documented approval step before tool actions, and data shared with a Super Agent can surface to anyone who can trigger it [V, Session 1]. A termination is confidential. It could later post friendly status summaries, nothing more. |
 | Zapier | No | Per-task cost, weaker audit, and a third party holding a path to your admin runbooks. |
 | n8n | No for v1 | Ownership moved to Mike's team in the transition; adding a privileged workload there splits ownership. Revisit if n8n becomes the team standard. |
@@ -181,14 +181,14 @@ You told me you run **Entra Connect Sync**. What follows is how Connect Sync beh
 | Topic | What I know | Depends on your config | How to verify |
 |---|---|---|---|
 | Where synced users are created | Synced users are created in AD; Connect Sync provisions them to Entra. Attributes mastered in AD (name, title, manager, UPN) must be changed in AD. | Which OUs are in sync scope | On the Connect server: Synchronization Service Manager, or `Get-ADSyncConnector` and review OU filtering. |
-| Sync delay | Default cycle is every 30 minutes [V]. A delta sync can be started on the Connect server with `Start-ADSyncSyncCycle -PolicyType Delta`. | Whether you changed the scheduler | `Get-ADSyncScheduler` on the Connect server (shows interval and next run). |
+| Sync delay | Default cycle is every 30 minutes [V]. A delta sync can be started on the Connect server with `Start-ADSyncSyncCycle -PolicyType Delta` [V]. | Whether you changed the scheduler | `Get-ADSyncScheduler` on the Connect server (shows interval and next run). |
 | Disabled accounts | Disabled AD accounts still sync to Entra [V]; the disabled state flows to Entra at the next cycle. So **an AD-only disable can leave cloud sign-in working for up to one cycle**, and existing tokens keep working until they expire. | Authentication method (password hash sync, pass-through auth, or federation) changes how fast an AD disable blocks new cloud sign-ins | `Get-MgDomain` (authenticationType) and the Connect wizard's "View current configuration". |
-| Disabling the cloud side directly | Microsoft's hybrid revocation guidance says: disable in AD, reset the password twice, **and** disable in Entra and revoke sessions [V]. Revoking sessions can take a few minutes to apply [V]. | Whether a cloud-side disable on a synced user persists or is overwritten by the next sync while AD is still enabled | **Test:** on a test synced user, set Entra `accountEnabled=false` only, wait for one sync, check it. Fixer disables AD in the same run, so either way the final state is disabled. |
+| Disabling the cloud side directly | Microsoft's hybrid revocation guidance says: disable in AD, reset the password twice, **and** disable in Entra and revoke sessions [V]. Revoking sessions can take a few minutes to apply; already-issued access tokens last up to one hour [V]. **A cloud-side block on a synced user is undone by the next sync if the AD account is still enabled** [V, corrected]. | Nothing; this is documented behavior | Fixer disables AD in the same containment run, and if the AD step fails it re-applies the cloud block every 5 minutes until AD is disabled (spec 7.1). |
 | Groups | AD security groups and AD distribution groups sync to Entra and must be changed in AD. Cloud groups (Microsoft 365 groups, Teams, cloud security groups) are changed in Entra. Dynamic groups can't take direct membership. | Which of your groups are AD-sourced | `Get-MgGroup -All -Property displayName,onPremisesSyncEnabled,groupTypes,mailEnabled` (Graph PowerShell). Fixer keeps a Group Registry table with source = AD or Cloud per group. |
 | Licenses | License assignment is cloud-only. A license needs `usageLocation` set on the user. Group-based licensing turns licensing into a group membership change. | Whether you license directly or by group, and whether license groups are AD or cloud groups | Entra admin center, Licenses, Licensed groups; `Get-MgSubscribedSku` for available counts. |
-| `usageLocation` on synced users | I believe it can be set in the cloud on synced users unless you sync it from AD [U]. | Your sync rules | Set it on a test synced user via Graph and confirm it persists after a sync. |
-| `employeeType` | Entra has an `employeeType` property [U on whether your Connect version syncs it by default]. | Sync rules | Check the attribute on a synced user after setting it in AD. |
-| AD account expiration (`accountExpires`) | Enforced by AD. I'm not certain it blocks cloud sign-in under password hash sync [U]. Treat it as a backstop only, never as the contractor control. | Auth method | Test on a contractor test account with an expiry in the past. |
+| `usageLocation` on synced users | Set in the cloud on synced users; this is Microsoft's documented licensing path [V]. A sync rule that maps the attribute would overwrite it. | Your sync rules | Confirm no rule maps usageLocation on the Connect server. |
+| `employeeType` | Synced by the default "In from AD - User Common" rule on Connect 2.2.1.0 (June 2023) and later; a cloned or customized rule may not include it [V]. | Connect version and rule state | Check the Connect version and the rule on the Connect server. |
+| AD account expiration (`accountExpires`) | **Not synchronized; an expired AD account stays active in Entra ID under password hash sync** [V, corrected]. Docs are silent for pass-through and federation. It is not a backstop; Fixer's scheduled offboarding is the only contractor end-date control. | Auth method (Q8) only changes whether a future test is worth running | None needed for the design. |
 | Exchange | If mailboxes once lived on an on-prem Exchange server, some mail attributes may still be managed from on-prem tools. | Whether you have (or had) Exchange hybrid | Check for an Exchange server or the Exchange Management Tools in AD; ask Netrio. |
 
 **Built-in alternative worth knowing (not recommended for v1):** Entra **API-driven inbound provisioning** can create, enable, and disable users in on-prem AD through a lightweight provisioning agent, with no inbound ports; it is available with Entra ID P1 [V], and **Lifecycle Workflows** can disable synced AD users with the same agent but need Entra ID Governance licenses [V]. Neither handles AD group membership changes or approvals by themselves, so they don't remove the need for a runbook host. Worth a second look if you later buy ID Governance.
@@ -247,7 +247,7 @@ You told me you run **Entra Connect Sync**. What follows is how Connect Sync beh
 | 16 | Add AD group memberships | **CHANGE** | AD | AD groups | Results per group |
 | 17 | Start delta sync, then poll Graph every 5 minutes up to 90 minutes for the new user | PREP | Connect server, Graph | UPN | Entra object ID, or "sync timeout" alert |
 | 18 | Set `usageLocation`, `preferredLanguage`; add cloud group memberships; assign license (direct or license group) | **CHANGE** | Entra, M365 | Change set | Results |
-| 19 | Invite to ClickUp workspace if selected (if the API supports it on your plan [U]; otherwise a human subtask) | **CHANGE** | ClickUp | Email | Member ID |
+| 19 | Invite to ClickUp workspace if selected (the invite and guest endpoints exist on the **Enterprise plan only** [V]; on any other plan this is a human subtask, Q14) | **CHANGE** | ClickUp | Email | Member ID |
 | 20 | Release app tickets: status "Ready", due on start date, assigned to app owners | PREP | ClickUp | Ticket IDs | Tickets in owners' queues |
 | 21 | On start morning: enable AD account; issue first credential per your policy (for example, a Temporary Access Pass to the supervisor) **[ASSUMPTION; see 14]** | **CHANGE** | AD, Entra | Change set | Enabled account |
 | 22 | Verify end state (account enabled in Entra, license active, groups present), post completion comment, set Fixer State "Complete" | PREP | Graph, ClickUp | Request | Verification record |
@@ -271,16 +271,16 @@ You told me you run **Entra Connect Sync**. What follows is how Connect Sync beh
 | 11 | At T minus 24 hours (scheduled path): if approvals are not complete, escalate (7.4) | PREP | PA | Request | Escalation |
 | 12 | Block Entra sign-in (`accountEnabled=false`) and revoke sessions | **CHANGE** | Entra | Object ID | Done, with timestamp |
 | 13 | Disable AD account, reset password twice to random values [V], stamp description with request ID, move to Disabled OU | **CHANGE** | AD | objectGUID | Done |
-| 14 | Remove ClickUp workspace membership (if API supported [U]; else urgent human subtask) | **CHANGE** | ClickUp | Member ID | Done |
+| 14 | Remove ClickUp workspace membership (Enterprise plan API only [V]; else urgent human subtask, Q14) | **CHANGE** | ClickUp | Member ID | Done |
 | 15 | Mailbox: set auto-reply, forwarding (internal only), delegate access; convert to shared mailbox if retaining | **CHANGE** | Exchange Online | Change set | Done |
 | 16 | OneDrive: grant access to "Transfer Files To" person | **CHANGE** | SharePoint / OneDrive | Change set | Done |
 | 17 | Remove from all AD groups and cloud groups (keep a license group only until 18) | **CHANGE** | AD, Entra | Snapshot | Done |
-| 18 | Remove licenses, **only after** step 15 confirms the shared mailbox conversion (removing a license from a user mailbox starts deletion of the mailbox after a grace period [U]) | **CHANGE** | M365 | Change set | Done |
+| 18 | Remove licenses, **only after** step 15 confirms the shared mailbox conversion. The convert option exists only while the mailbox is licensed; after removal the data is held 30 days and then deleted [V] | **CHANGE** | M365 | Change set | Done |
 | 19 | Release revoke tickets (due within 4 business hours **[ASSUMPTION]**); cancel open onboarding tickets | PREP | ClickUp | Ticket IDs | Tickets in owners' queues |
 | 20 | Verify after next sync: Entra disabled, no sessions, no licenses, no group memberships; post completion | PREP | Graph | Request | Verification record |
-| 21 | Account deletion at T plus 30 days **[ASSUMPTION: your retention rule]**, as a **separate approval** because it is irreversible | **CHANGE** | AD | objectGUID | Deleted (AD Recycle Bin should be on) |
+| 21 | Account deletion at T plus 30 days **[ASSUMPTION: your retention rule]**, as a **separate approval** because it is irreversible. **Skipped when the mailbox was retained as shared**, because the shared mailbox stays anchored to the user object [V]; the account stays disabled instead | **CHANGE** | AD | objectGUID | Deleted (AD Recycle Bin should be on) |
 
-**Verify:** the mailbox grace period and shared mailbox behavior in Microsoft's Exchange Online documentation before building step 18.
+Shared mailboxes under 50 GB with no archive and no litigation hold need no license [V]. In an Exchange hybrid, the conversion must be done with on-premises `Set-RemoteMailbox -Type Shared` or sync reverts it [V] (Q11).
 
 ---
 
@@ -301,7 +301,7 @@ You told me you run **Entra Connect Sync**. What follows is how Connect Sync beh
 
 - **Mechanism:** Power Automate Approvals ("Start and wait for an approval" or "Create an approval" plus "Wait for an approval"), delivered as Teams adaptive cards and email. Custom responses: **Approve**, **Request changes**, **Reject**.
 - **Recorded in three places:** (1) the Power Automate approval record (who, when, response, comments) [U on retention details]; (2) a row in the Fixer Audit Log with approver UPN, timestamp, response, comment, and the **change set hash**; (3) a ClickUp comment on the originating task: "Approved by Jane Doe (IT Director) at 10:42 AM ET, change set a1b2c3."
-- **Verify:** where your tenant stores approval history (the Approvals feature uses Dataverse in the default environment [U]) and how long it is retained. Fixer's own audit log is the record of truth either way.
+- Approval records are stored in Dataverse in the flow's environment [V]; flow run history is kept 28 days by default [V]. Fixer's own audit log is the record of truth. Any approval that could stay open more than 30 days uses "Create an approval" with a separate response-triggered flow, because a flow run and its pending approvals time out at 30 days [V].
 
 ### 7.3 What the approver sees (example card)
 
@@ -391,7 +391,7 @@ Rules for the card: plain language, every change listed (no "and 4 more"), dates
 | Failure | Retry? | Then | Alert who |
 |---|---|---|---|
 | Webhook signature invalid | No | Drop, log | Fixer owner (daily digest; immediate if more than 3 per hour) |
-| ClickUp API 429 rate limit | Yes, honor Retry-After, exponential backoff, max 5 | Mark step failed | Fixer owner |
+| ClickUp API 429 rate limit | Yes, wait until the `X-RateLimit-Reset` timestamp (ClickUp sends no Retry-After header [V]), max 5 | Mark step failed | Fixer owner |
 | Graph 429 or 503 throttling | Yes, honor Retry-After, max 5 | Mark step failed | Fixer owner |
 | Auth failure (expired secret or certificate, managed identity misconfigured) | No (a retry won't fix it) | Stop all CHANGE steps globally ("circuit open"), queue requests | Fixer owner and IT approvers immediately; offboardings due within 24h listed in the alert so humans can execute manually |
 | Permission denied (403) on a specific action | No | Mark step failed, continue independent steps | Fixer owner |
@@ -401,7 +401,7 @@ Rules for the card: plain language, every change listed (no "and 4 more"), dates
 | **Partial failure** | n/a | Completed steps stay done (no automatic rollback of identity changes, which can make things worse). Failed and remaining steps listed on the task; State "Partially Complete". For offboarding, **containment steps are retried and escalated before anything else.** | Fixer owner; task assignee |
 | LLM extraction fails or returns low confidence | One retry | Proceed without the extraction; items marked "needs human review" on the card | None (shown on card) |
 
-**Ordering rule for offboarding:** Entra block and session revoke run first because they are fastest and don't depend on the hybrid worker. If AD disable fails, the cloud is already closed and the alert says so.
+**Ordering rule for offboarding:** Entra block and session revoke run first because they are fastest and don't depend on the hybrid worker. If AD disable fails, the cloud block is **not** durable: the next sync re-enables a synced account whose AD object is still enabled [V, corrected]. The Scheduler re-applies the block and re-revokes sessions every 5 minutes until the AD disable succeeds, and the alert says exactly that.
 
 ---
 
@@ -443,8 +443,8 @@ Rules for the card: plain language, every change listed (no "and 4 more"), dates
 
 | Option for on-prem AD | Reliability | Permissions | Auditability | Maintenance | Verdict |
 |---|---|---|---|---|---|
-| Azure Automation Hybrid Runbook Worker | Good; worker must stay online (workers silent for 30 days are purged [V]) | Scoped AD service account with delegated rights on specific OUs only | Job logs in Azure, plus Fixer audit log | Patch one server; keep Arc agent current; note an Arc agent update can reset folder permissions for custom credentials [V] | **Recommended** |
-| Power Automate on-premises data gateway | I'm not aware of a supported AD write connector through the gateway [U] | n/a | n/a | n/a | **Verify** before considering; I would not plan on it |
+| Azure Automation Hybrid Runbook Worker | Good; worker must stay online (a worker group silent for 30 days is purged [V]; run two workers) | Scoped AD service account with delegated rights on specific OUs only | Job logs in Azure, plus Fixer audit log | Patch one server; keep Arc agent current; note an Arc agent update can reset folder permissions for custom credentials [V] | **Recommended** |
+| Power Automate on-premises data gateway | No AD connector exists in the gateway's documented connection list [V] | n/a | n/a | n/a | Not possible |
 | Power Automate Desktop (RPA) on a server | Fragile (UI or script runner, machine queueing) | Runs as a machine user | Weaker | High | No |
 | NinjaOne script on a domain controller | Works technically | Requires a NinjaOne Management key, which Session 1 established is effectively remote code execution on every endpoint | NinjaOne activity log | Ties identity changes to an RMM with tenant-wide keys | No |
 | Entra API-driven inbound provisioning (provisioning agent) | Good for create, enable, disable | Agent's gMSA | Provisioning logs | Low | **Later**: no AD group changes, so still needs a worker |
@@ -454,8 +454,8 @@ Rules for the card: plain language, every change listed (no "and 4 more"), dates
 
 | Identity | Rights |
 |---|---|
-| Power Automate flows (service account or connection) | ClickUp API token (scoped user), start jobs on specific runbooks only (Azure "Automation Job Operator" on the Automation account [U on exact role name]), read and write Fixer SharePoint lists. **No Graph write, no AD rights.** |
-| Automation account managed identity (cloud runbooks) | Graph application permissions, minimal set **[U; verify each against Graph permission reference]**: `User.ReadWrite.All` (accountEnabled, usageLocation), `User.RevokeSessions.All` [V], `GroupMember.ReadWrite.All`, `LicenseAssignment.ReadWrite.All` [U], Exchange Online app-only access with a scoped role for mailbox settings |
+| Power Automate flows (service account or connection) | ClickUp API token (scoped user), start jobs on runbooks (Azure built-in role **Automation Job Operator**, which can create and manage jobs but not edit runbooks [V]), read and write Fixer SharePoint lists. **No Graph write, no AD rights.** |
+| Automation account managed identity (cloud runbooks) | Graph application permissions, least-privileged set [V]: `User.Read.All`, `User.EnableDisableAccount.All` (accountEnabled), `User.ReadUpdate.All` (usageLocation, preferredLanguage), `User.RevokeSessions.All`, `GroupMember.ReadWrite.All`, `LicenseAssignment.ReadWrite.All`, `LicenseAssignment.Read.All` (subscribedSkus), `UserAuthMethod-TAP.ReadWrite.All` if TAP is adopted; Exchange Online app-only access with a scoped role for mailbox settings. Never `Directory.ReadWrite.All`. |
 | Hybrid worker AD service account | Delegated permissions on the Employees, Contractors, and Disabled OUs only: create and disable user, reset password, write specific attributes, modify membership of groups in a "Fixer-managed" OU. **Not** Domain Admin. Rights to run delta sync on the Connect server, or a narrowly scoped scheduled task there. |
 | Sensitive groups | Admin, finance, and privileged groups are **outside** the Fixer-managed OU, so Fixer cannot add anyone to them even if asked |
 
@@ -528,7 +528,7 @@ The pack is the proof: if it doesn't arrive Monday, that alone is an alert.
 11. Exchange hybrid: any on-prem Exchange server today or in the past?
 12. Are Claude and ChatGPT single sign-on apps in Entra, assigned by group?
 13. Which server can host the Hybrid Runbook Worker, and does Netrio need to be in that change (co-managed servers)?
-14. Your ClickUp plan tier (affects API rate limits and whether workspace invites and removals are available by API).
+14. Your ClickUp plan tier. Verified: user and guest invite and removal endpoints are Enterprise only; rate limits are 100 requests per minute per token on Business and below, 1,000 on Business Plus, 10,000 on Enterprise; form conditional logic needs Business Plus or Enterprise [V].
 
 **Forms**
 15. OK to make the form changes in 4.3, and who owns the forms today?
@@ -536,21 +536,109 @@ The pack is the proof: if it doesn't arrive Monday, that alone is an alert.
 
 ---
 
-## Sources
+## 15. Verification appendix (added in v0.2)
 
-Verified this session (one official source each, below your three-source bar; none of these were cross-checked against two more independent sources):
+All claims were checked on October 13, 2026 against official vendor pages only: learn.microsoft.com for Microsoft, developer.clickup.com and help.clickup.com for ClickUp. No forums, blogs, or social media were used. "Pages" is the number of distinct official pages that support the verdict. For vendor product behavior there is one authoritative publisher, so this count, not a three-independent-source count, is the right measure; where only one page supports a claim that is stated.
 
-- [Microsoft Entra Connect Sync: best practices (default 30-minute sync cycle)](https://learn.microsoft.com/entra/identity/hybrid/connect/how-to-connect-sync-best-practices-changing-default-configuration)
-- [Microsoft Entra Connect Sync: users, groups, and contacts (disabled accounts sync)](https://learn.microsoft.com/entra/identity/hybrid/connect/concept-azure-ad-connect-sync-user-and-contacts#disabled-accounts)
-- [Revoke user access in Microsoft Entra ID (hybrid steps)](https://learn.microsoft.com/entra/identity/users/users-revoke-access#revoke-access-for-a-user-in-the-hybrid-environment)
-- [Microsoft Graph: user revokeSignInSessions](https://learn.microsoft.com/graph/api/user-revokesigninsessions?view=graph-rest-1.0)
+### 15.1 Microsoft
+
+| # | Claim (v0.1 status) | Verdict | What the docs say | Pages |
+|---|---|---|---|---|
+| M1 | usageLocation can be set in the cloud on synced users [U] | Partial, now [V] | Documented licensing path for synced accounts is to set usageLocation in the cloud. Synced attributes are otherwise read-only in the cloud; a sync rule mapping the attribute would overwrite it. | 5 |
+| M2 | employeeType syncs from AD [U] | Confirmed | Added as a syncable property in Connect 2.0.3.0; the default "In from AD - User Common" rule flows it from 2.2.1.0. Customized rules may not. | 2 |
+| M3 | accountExpires may not block cloud sign-in under PHS [U] | Confirmed, stronger than assumed | "An expired Active Directory account in an environment configured for password hash synchronization will still be active in Microsoft Entra ID." Docs are silent for PTA and AD FS. | 4 |
+| M4 | Cloud-side disable on a synced user might be overwritten [U] | Confirmed: it is | "If the account is enabled on premises, it can unblock the sign-in block placed by administrator." accountEnabled flows from AD userAccountControl. | 3 |
+| M5 | Mailbox deleted after a grace period when the license is removed [U] | Confirmed | 30-day hold, then deletion. Convert to shared needs the license present. Shared under 50 GB needs no license. Optional Delicensing Resiliency adds 30 days. Hybrid: convert with Set-RemoteMailbox. | 6 |
+| M6 | Approvals stored in Dataverse; 30-day run limit [U] / [V] | Confirmed | Approvals saved in Dataverse in the flow's environment; run duration limit 30 days including pending approvals; run history 28 days. | 5 |
+| M7 | No AD write connector through the data gateway [U] | Confirmed | The gateway's documented connection list has no Active Directory connector. First-party AD write actions exist only in Power Automate for desktop. | 5 |
+| M8 | "Automation Job Operator" role name [U] | Confirmed | Creates and manages jobs for all runbooks; cannot create, edit, or delete runbooks. | 3 |
+| M9 | Graph permission set [U] | Confirmed, with narrower options | accountEnabled: User.EnableDisableAccount.All plus User.Read.All. PATCH user: User.ReadUpdate.All. Revoke: User.RevokeSessions.All. Groups: GroupMember.ReadWrite.All. Licenses: LicenseAssignment.ReadWrite.All; subscribedSkus: LicenseAssignment.Read.All. licenseDetails is delegated-only. | 10 |
+| M10 | TAP for first sign-in [ASSUMPTION 8] | Confirmed feasible | Designed for first sign-in with no prior method; user must be in the TAP policy scope; one TAP per user; 10 minutes to 30 days lifetime. | 4 |
+| M11 | 30-minute default sync; Start-ADSyncSyncCycle [V] | Confirmed | As stated. | 3 |
+| M12 | Hybrid worker purged after 30 days silent [V] | Confirmed | The worker group is purged after more than 30 days without a ping; re-register to recover. | 2 |
+| M13 | Hybrid revoke steps and timing [V] | Confirmed | Disable in AD, reset password twice, disable in Entra, revoke refresh tokens, disable devices. Revocation takes a few minutes; access tokens last up to one hour. | 3 |
+| M14 | Graph can read assigned licenses and SKU availability | Confirmed | subscribedSkus gives consumedUnits and prepaidUnits.enabled with LicenseAssignment.Read.All; per-user via the assignedLicenses property. | 5 |
+
+### 15.2 ClickUp
+
+| # | Claim (v0.1 status) | Verdict | What the docs say | Pages |
+|---|---|---|---|---|
+| C1 | X-Signature is HMAC-SHA256 hex of the raw body [V] | Confirmed | As stated; the body must be the raw bytes, not re-serialized JSON. | 2 |
+| C2 | Retry and health behavior unknown [U] | Confirmed, specifics found | Failed = non-success status or more than 7 seconds; up to five retries per event; fail_count 100 suspends the webhook with no notification; a 410 suspends immediately; recovery resets the count; a suspended webhook is reactivated with Update Webhook. | 2 |
+| C3 | List-scoped webhooks and event names [V] | Confirmed | list_id scope; taskCreated, taskUpdated, taskStatusUpdated, taskCommentPosted and others. taskStatusUpdated is also sent for every new task. | 3 |
+| C4 | Native Automation webhook action, plan and signing [U] | Confirmed: unsigned | Available on Business and above; no signature, custom headers only; retried for 1 hour 15 minutes. | 4 |
+| C5 | Workspace invite and remove by API [U] | Confirmed: Enterprise only | Invite, edit, remove user; invite, edit, remove guest. All Enterprise-only. | 4 |
+| C6 | Rate limits and Retry-After [U] | Partial | 100 per minute per token on Business and below, 1,000 on Business Plus, 10,000 on Enterprise; 429 with X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset. No Retry-After header documented. | 1 |
+| C7 | Form required questions and logic [U] | Partial | Question-level Required on all plans; conditional logic on Business Plus and Enterprise; one submission task per submission; no documented way to create several tasks from one submission. | 6 |
+| C8 | Webhook payload carries only task_id and history [U] | Confirmed | event, history_items, task_id, webhook_id; use webhook_id:history_item_id as the idempotency key. | 2 |
+| C9 | Existing automations can be listed by API | Not found | No public endpoint for Automations; the audit is manual in the UI. | 0 |
+| C10 | Get Task returns custom field values usable by Fixer | Partial | include_subtasks flag; dropdown values are option IDs; dates are Unix milliseconds; unset checkboxes may be null. | 6 |
+
+### 15.3 Sources
+
+Microsoft (learn.microsoft.com):
+- [Assign licenses to user accounts with PowerShell (usageLocation on synced accounts)](https://learn.microsoft.com/microsoft-365/enterprise/assign-licenses-to-user-accounts-with-microsoft-365-powershell)
+- [Bypass DirSync overrides (synced properties read-only in the cloud)](https://learn.microsoft.com/entra/identity/hybrid/connect/how-to-bypassdirsyncoverrides)
+- [Attributes synchronized by Entra Connect](https://learn.microsoft.com/entra/identity/hybrid/connect/reference-connect-sync-attributes-synchronized)
+- [Entra Connect version history (employeeType, 2.0.3.0 and 2.2.1.0)](https://learn.microsoft.com/entra/identity/hybrid/connect/reference-connect-version-history)
+- [Password hash synchronization (accountExpires not synchronized)](https://learn.microsoft.com/entra/identity/hybrid/connect/how-to-connect-password-hash-synchronization)
+- [Pass-through authentication FAQ (token validity on expiry)](https://learn.microsoft.com/entra/identity/hybrid/connect/how-to-connect-pta-faq)
+- [Entra Connect FAQ (cloud sign-in block unblocked by on-premises enabled account)](https://learn.microsoft.com/entra/identity/hybrid/connect/reference-connect-faq)
+- [Entra Connect sync default configuration (accountEnabled from userAccountControl)](https://learn.microsoft.com/entra/identity/hybrid/connect/concept-azure-ad-connect-sync-default-configuration)
+- [Delete or restore mailboxes (30-day hold after license removal)](https://learn.microsoft.com/exchange/recipients-in-exchange-online/delete-or-restore-mailboxes)
+- [Convert a user mailbox to a shared mailbox (license required to convert; 50 GB)](https://learn.microsoft.com/microsoft-365/admin/email/convert-user-mailbox-to-shared-mailbox)
+- [Create a shared mailbox (when a license is required)](https://learn.microsoft.com/microsoft-365/admin/email/create-a-shared-mailbox)
+- [Exchange Online delicensing resiliency](https://learn.microsoft.com/exchange/recipients-in-exchange-online/manage-user-mailboxes/exchange-online-delicensing-resiliency)
+- [Convert a mailbox in Exchange hybrid (Set-RemoteMailbox)](https://learn.microsoft.com/exchange/recipients-in-exchange-online/manage-user-mailboxes/convert-a-mailbox)
+- [Get started with approvals (saved in Dataverse)](https://learn.microsoft.com/power-automate/get-started-approvals)
+- [Power Automate limits (30-day run duration)](https://learn.microsoft.com/power-automate/limits-and-config)
+- [Modern approvals (store approvals in Dataverse for runs over 30 days)](https://learn.microsoft.com/power-automate/modern-approvals)
+- [Cloud flow run metadata (28-day run history)](https://learn.microsoft.com/power-automate/dataverse/cloud-flow-run-metadata)
+- [Manage an on-premises data gateway (supported connections)](https://learn.microsoft.com/power-automate/gateway-manage)
+- [Power Automate for desktop Active Directory actions](https://learn.microsoft.com/power-automate/desktop-flows/actions-reference/activedirectory)
+- [Azure Automation role-based access control (Automation Job Operator)](https://learn.microsoft.com/azure/automation/automation-role-based-access-control)
+- [Azure built-in roles: management and governance](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/management-and-governance#automation-job-operator)
+- [Graph: Update user (User.EnableDisableAccount.All, User.ReadUpdate.All, usageLocation)](https://learn.microsoft.com/graph/api/user-update)
+- [Graph: user revokeSignInSessions](https://learn.microsoft.com/graph/api/user-revokesigninsessions)
+- [Graph: Add group members](https://learn.microsoft.com/graph/api/group-post-members)
+- [Graph: Remove group member ($ref warning)](https://learn.microsoft.com/graph/api/group-delete-members)
+- [Graph: user assignLicense](https://learn.microsoft.com/graph/api/user-assignlicense)
+- [Graph: List subscribedSkus](https://learn.microsoft.com/graph/api/subscribedsku-list)
+- [Graph: List licenseDetails (application not supported)](https://learn.microsoft.com/graph/api/user-list-licensedetails)
+- [Graph permissions reference](https://learn.microsoft.com/graph/permissions-reference)
+- [Temporary Access Pass](https://learn.microsoft.com/entra/identity/authentication/howto-authentication-temporary-access-pass)
+- [Entra Connect sync scheduler (30 minutes, Start-ADSyncSyncCycle)](https://learn.microsoft.com/entra/identity/hybrid/connect/how-to-connect-sync-feature-scheduler)
+- [Troubleshoot extension-based Hybrid Runbook Worker (30-day purge)](https://learn.microsoft.com/azure/automation/troubleshoot/extension-based-hybrid-runbook-worker)
+- [Hybrid Runbook Worker overview (job suspension when no worker pings)](https://learn.microsoft.com/azure/automation/automation-hybrid-runbook-worker)
+- [Revoke user access in Entra ID (hybrid steps, token lifetimes)](https://learn.microsoft.com/entra/identity/users/users-revoke-access)
 - [Deploy an extension-based Hybrid Runbook Worker](https://learn.microsoft.com/azure/automation/extension-based-hybrid-runbook-worker-install)
-- [Run runbooks on a Hybrid Runbook Worker (permissions, managed identities)](https://learn.microsoft.com/azure/automation/automation-hrw-run-runbooks#configure-runbook-permissions)
-- [Troubleshoot extension-based Hybrid Runbook Worker (30-day purge, Arc permission reset)](https://learn.microsoft.com/azure/automation/troubleshoot/extension-based-hybrid-runbook-worker#general-checklist)
-- [Power Automate limits (30-day run duration)](https://learn.microsoft.com/power-automate/limits-and-config#duration-and-retention-limits)
-- [Power Automate error reference (approval timeouts)](https://learn.microsoft.com/power-automate/error-reference#timeout-and-throttling-errors)
+- [Run runbooks on a Hybrid Runbook Worker](https://learn.microsoft.com/azure/automation/automation-hrw-run-runbooks#configure-runbook-permissions)
 - [Managing synced AD users with Lifecycle Workflows](https://learn.microsoft.com/entra/id-governance/lifecycle-workflow-on-premises)
-- [API-driven inbound provisioning concepts (P1 availability, AD target)](https://learn.microsoft.com/entra/identity/app-provisioning/inbound-provisioning-api-concepts)
-- [ClickUp: Webhook signature (X-Signature, HMAC-SHA256)](https://developer.clickup.com/docs/webhooksignature)
+- [API-driven inbound provisioning concepts](https://learn.microsoft.com/entra/identity/app-provisioning/inbound-provisioning-api-concepts)
 
-Observed directly: ClickUp lists "📋 New Hire IT Onboarding Form" and "📋 Employee IT Offboarding Form", their custom fields, recent tasks, and subtasks (October 13, 2026).
+ClickUp (developer.clickup.com, help.clickup.com):
+- [Webhook signature](https://developer.clickup.com/docs/webhooksignature)
+- [Webhooks overview (scopes, events, idempotency key)](https://developer.clickup.com/docs/webhooks)
+- [Webhook health (7 seconds, five retries, suspension at 100)](https://developer.clickup.com/docs/webhookhealth)
+- [Webhook task payloads](https://developer.clickup.com/docs/webhooktaskpayloads)
+- [Create Webhook](https://developer.clickup.com/reference/createwebhook)
+- [Update Webhook](https://developer.clickup.com/reference/updatewebhook)
+- [APIs available by plan](https://developer.clickup.com/docs/apis-available-by-plan)
+- [Invite User To Workspace](https://developer.clickup.com/reference/inviteusertoworkspace)
+- [Remove User From Workspace](https://developer.clickup.com/reference/removeuserfromworkspace)
+- [Invite Guest To Workspace](https://developer.clickup.com/reference/inviteguesttoworkspace)
+- [Rate limits](https://developer.clickup.com/docs/rate-limits)
+- [Get Task](https://developer.clickup.com/reference/gettask)
+- [Custom Fields](https://developer.clickup.com/docs/customfields)
+- [Set Custom Field Value](https://developer.clickup.com/reference/setcustomfieldvalue)
+- [Automation Call webhook payload](https://developer.clickup.com/docs/automationwebhookpayload)
+- [Automations feature availability and limits](https://help.clickup.com/hc/en-us/articles/23477062949911-Automations-feature-availability-and-limits)
+- [Integrate ClickUp using Automation webhooks](https://help.clickup.com/hc/en-us/articles/35313844961943-Integrate-ClickUp-using-Automation-webhooks)
+- [Create a task webhook Automation](https://help.clickup.com/hc/en-us/articles/31126817112343-Create-a-task-webhook-Automation)
+- [Edit Form questions (Required)](https://help.clickup.com/hc/en-us/articles/30719819694999-Edit-Form-questions)
+- [Add questions to a Form](https://help.clickup.com/hc/en-us/articles/30688109079191-Add-questions-to-a-Form)
+- [Use conditional logic in Forms](https://help.clickup.com/hc/en-us/articles/30720189184791-Use-conditional-logic-in-Forms)
+- [Form view feature availability and limits](https://help.clickup.com/hc/en-us/articles/25810829634711-Form-view-feature-availability-and-limits)
+- [Intro to Forms and Form view](https://help.clickup.com/hc/en-us/articles/6310233090711-Intro-to-Forms-and-Form-view)
+
+Observed directly: ClickUp lists "📋 New Hire IT Onboarding Form" and "📋 Employee IT Offboarding Form", their custom fields, statuses, recent tasks, and subtasks (October 13, 2026). Field IDs are recorded in `config/clickup-fields.json`.

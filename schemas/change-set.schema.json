@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://swimusa.com/fixer/schemas/change-set.schema.json",
+  "title": "Fixer change set",
+  "description": "The single object an approver approves and Fixer executes. Hash = SHA-256 of the canonical JSON (sorted keys, no whitespace, UTF-8). Secrets never appear here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "requestId", "requestKey", "path", "stage", "subject", "items", "suggestions", "flags", "builtAt"],
+  "properties": {
+    "version": { "const": 1 },
+    "requestId": { "type": "string", "pattern": "^FX-[0-9]{4}-[0-9]{4,}$" },
+    "requestKey": { "type": "string", "minLength": 8 },
+    "path": { "enum": ["EmployeeOnboard", "ContractorOnboard", "EmployeeOffboard", "ContractorOffboard"] },
+    "stage": {
+      "description": "Onboarding has one executable set. Offboarding has Containment, Deprovision, and Delete, each approved separately.",
+      "enum": ["Onboard", "Containment", "Deprovision", "Delete"]
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName", "workerType"],
+      "properties": {
+        "displayName": { "type": "string" },
+        "givenName": { "type": "string" },
+        "surname": { "type": "string" },
+        "workerType": { "enum": ["Employee", "Contractor"] },
+        "upn": { "type": "string" },
+        "samAccountName": { "type": "string" },
+        "mail": { "type": "string" },
+        "adObjectGuid": { "type": "string" },
+        "entraObjectId": { "type": "string" },
+        "managerUpn": { "type": "string" },
+        "sponsorUpn": { "type": "string" },
+        "title": { "type": "string" },
+        "siteCode": { "type": "string" },
+        "usageLocation": { "type": "string", "pattern": "^[A-Z]{2}$" },
+        "preferredLanguage": { "type": "string" },
+        "startAt": { "type": "string", "format": "date-time" },
+        "enableAt": { "type": "string", "format": "date-time" },
+        "cutoffAt": { "type": "string", "format": "date-time" },
+        "contractEndDate": { "type": "string", "format": "date" }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "suggestions": {
+      "description": "Not executed and not hashed into the executable set. Shown to the approver; accepted ones become items through Request changes, which produces a new hash.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/suggestion" }
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "enum": ["ShortNotice", "PossibleRehire", "ReplacingUser", "LicensePurchaseNeeded", "PrivilegedAccount", "SharedOrServiceAccount", "ExternalForwarding", "UnmatchedFreeText", "Confidential", "CutoffMovedLater", "RequesterIsApprover", "WorkerTypeDefaulted", "MultiPersonSubmission"] },
+          "message": { "type": "string" },
+          "detail": { "type": "object" }
+        }
+      }
+    },
+    "builtAt": { "type": "string", "format": "date-time" },
+    "builtFromTaskUpdatedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "source", "reason", "approvalStage"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable within the request, used as the StepKey suffix" },
+        "type": {
+          "enum": [
+            "AdCreateUser", "AdEnableUser", "AdDisableUser", "AdDeleteUser", "AdAddGroup", "AdRemoveGroup",
+            "EntraSetProps", "EntraAddGroup", "EntraRemoveGroup", "EntraAssignLicense", "EntraRemoveLicense",
+            "EntraBlockSignIn", "EntraRevokeSessions", "EntraIssueTap",
+            "ExoAutoReply", "ExoForward", "ExoDelegate", "ExoConvertShared",
+            "OneDriveGrant",
+            "ClickUpInvite", "ClickUpRemove", "ClickUpAppTicket", "ClickUpRevokeTicket", "ClickUpHumanTask"
+          ]
+        },
+        "source": { "enum": ["AD", "Cloud", "ClickUp"] },
+        "target": {
+          "description": "What the item acts on: a group name, SKU, app, mailbox setting, or OU",
+          "type": "object"
+        },
+        "reason": { "type": "string", "description": "Which form field, table row, or rule produced this item; shown on the approval card" },
+        "approvalStage": { "enum": [1, 2] },
+        "runAfter": { "type": "array", "items": { "type": "string" } },
+        "runAt": { "enum": ["Execute", "Enable", "Cutoff", "Delete"], "default": "Execute" }
+      }
+    },
+    "suggestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "proposed", "basis", "confidence"],
+      "properties": {
+        "kind": { "enum": ["CopyFromGroup", "ImpliedApp", "DistroListMatch", "TicketReassignment"] },
+        "proposed": { "$ref": "#/$defs/item" },
+        "basis": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}
