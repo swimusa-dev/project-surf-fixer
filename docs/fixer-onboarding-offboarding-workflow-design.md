@@ -1,6 +1,6 @@
 # Fixer: Onboarding and Offboarding Workflow Design
-**Surf Crew / Fixer** | Draft v0.2 | October 13, 2026 | Owner of this doc: Dave Christy
-**Status:** design draft. Items marked **[ASSUMPTION]** or listed in section 14 need your answer before build. v0.2 adds the verification appendix (section 15) and corrects the lines it overturned; the build-level detail lives in [Phase 0 Build Specification](phase-0-build-spec.md).
+**Surf Crew / Fixer** | Draft v0.3 | October 13, 2026 | Owner of this doc: Dave Christy
+**Status:** design draft with decisions applied. Thirteen of the section 14 questions and assumptions were answered on October 13, 2026; the [Decision Log](decisions.md) is authoritative where it and this document differ. v0.2 added the verification appendix (section 15); v0.3 adds section 16 and withdraws the contractor-specific path. Build-level detail lives in the [Phase 0 Build Specification](phase-0-build-spec.md).
 
 **Confidence key.** **[V]** checked against official vendor documentation (learn.microsoft.com, developer.clickup.com, help.clickup.com); the appendix gives the page count per claim, which is the honest measure against your three-source bar since vendor behavior has one authoritative publisher. **[U]** my working knowledge, not verified; each has a "how to verify" note. **[OBS]** observed directly in your ClickUp workspace today. **[V, corrected]** a v0.1 claim the verification overturned.
 
@@ -155,6 +155,8 @@ Fields below exist as ClickUp custom fields on the onboarding list. None are mar
 | Specific Instructions | LLM extracts handling notes (for example, "Dave will handle removing GitHub and Databricks access" on [Chandra Vijay](https://app.clickup.com/t/868met07j) reassigns that app ticket to Dave) | ClickUp tickets |
 
 ### 4.3 Required form changes (prerequisite)
+
+**Decided October 13, 2026 (Q15): every row below except the Fixer custom fields was declined.** The table is kept as the record of what was proposed; section 16 and the decision log say how Fixer copes without each field.
 
 | Form | Add field | Why |
 |---|---|---|
@@ -367,6 +369,8 @@ Rules for the card: plain language, every change listed (no "and 4 more"), dates
 
 ### 8.3 Contractor end dates
 
+**Withdrawn October 13, 2026 (Q15):** no end date is captured, so none of this section is built. Kept for the record. The residual control is a proof pack line listing contractor accounts with no sign-in in 60 days.
+
 - **Capture:** Contract End Date is required on the contractor form (4.3). Fixer rejects an end date more than 12 months out **[ASSUMPTION]**.
 - **Enforcement:** at onboarding, Fixer writes a **scheduled offboarding** to Fixer Requests for the end date and sets AD `accountExpires` for on-premises logon only; it is **not** a cloud backstop, because password hash sync ignores it [V]. At end minus 10 business days, Fixer comments to the sponsor and creates the offboarding request so approvals happen before the date. At end minus 2 business days, it escalates if neither an extension nor approval exists.
 - **Missing end date** (including today's 17 contractors with none [OBS]): onboarding stays in "Needs Info". For existing contractors, a one-time backfill: Fixer lists active contractor accounts and asks each sponsor for an end date.
@@ -493,7 +497,7 @@ The pack is the proof: if it doesn't arrive Monday, that alone is an alert.
 | 1. Shadow mode (2 to 4 weeks) | Intake, validation, change set, approval card **in preview only** (no execution); late-fire alarm on real offboardings is **live** | 95 percent of change sets match what techs actually did; zero missed cutoffs unnoticed |
 | 2. Employee onboarding live | Execution with approvals | 10 clean runs; rollback tested on a test account |
 | 3. Offboarding live | Containment and deprovision with approvals; canary weekly | 100 percent containment within 15 minutes of cutoff for 4 weeks |
-| 4. Contractors and end dates | Contractor paths, end-date scheduler, backfill of existing contractors | No active contractor without an end date |
+| 4. Contractors and end dates | **Withdrawn (Q15).** Replaced by the contractor dormancy line in the weekly proof pack | n/a |
 
 ---
 
@@ -642,3 +646,21 @@ ClickUp (developer.clickup.com, help.clickup.com):
 - [Intro to Forms and Form view](https://help.clickup.com/hc/en-us/articles/6310233090711-Intro-to-Forms-and-Form-view)
 
 Observed directly: ClickUp lists "📋 New Hire IT Onboarding Form" and "📋 Employee IT Offboarding Form", their custom fields, statuses, recent tasks, and subtasks (October 13, 2026). Field IDs are recorded in `config/clickup-fields.json`.
+
+---
+
+## 16. Decisions applied (v0.3)
+
+The decision log holds the answers. What changes in this design:
+
+1. **Two paths, not four.** Worker type is still detected (3.3) and still decides the OU and `employeeType`, but it changes no approval, license, app, or timing rule (Q5, Q15). Read the four-column access matrix in 6.1 as two columns: onboard and offboard.
+2. **No contractor end-date enforcement.** Section 8.3 and build Phase 4 are withdrawn (Q15).
+3. **Offboarding urgency** is the cutoff timestamp alone (Q16): at or before submission time means immediate (7.6 applies); later means scheduled.
+4. **No confidential flag.** Revoke tickets and app-owner notifications are created at the cutoff for every offboarding, never at submission (8.2 "Confidential terminations" becomes the default behavior for ticket timing).
+5. **Retention rule** (Q7): a forward or delegate on the form means convert to shared and keep the account disabled; otherwise remove the license and delete the account at T plus 30 under its own approval (6.3 steps 15, 18, 21).
+6. **First credential** (A8): Temporary Access Pass to the supervisor on the start morning (6.2 step 21).
+7. **License** (A4, Q10): Microsoft 365 Business Premium, assigned directly (6.2 steps 10 and 18).
+8. **Platform facts** (Q8, Q9, Q11, Q13, Q14): password hash sync; separate OUs exist; decommissioned Exchange hybrid, to be checked for AD-mastered mail attributes; hybrid worker on an existing Netrio co-managed server; ClickUp Business Plus, so workspace invite and removal stay human subtasks.
+9. **Owner** (Q1): Dave Christy.
+
+Still open and blocking Phase 2, not Phase 0: Q2 (HR approver), Q3 (IT approver chain and on-call group), Q6 (pre-approved containment), plus the names and paths listed at the end of the decision log.
