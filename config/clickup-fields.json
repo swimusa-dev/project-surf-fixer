@@ -161,9 +161,7 @@
     { "id": "f752eb0c-be1e-44ed-b34d-a798752abc02", "name": "Allocation Email" }
   ],
   "fields_to_add": {
-    "$comment": "Fill in IDs after the fields are created in ClickUp (Phase 0). Definitions are in docs/phase-0-build-spec.md section 2.",
-    "both_lists": ["Fixer Request ID", "Fixer State", "Worker Type (resolved)", "Approval Status", "Scheduled Execution", "Fixer Summary"],
-    "onboarding": ["Worker Type", "Contract End Date", "Sponsor Email", "Contracting Company", "Additional Apps", "Credential Delivery Contact"],
-    "offboarding": ["Worker Type", "Urgency", "Confidential", "Mailbox Retention"]
+    "$comment": "Fill in IDs after the fields are created in ClickUp (Phase 0, P0-8). Definitions are in docs/phase-0-build-spec.md section 1. No other form fields are added (decision Q15, 2026-10-13).",
+    "both_lists": ["Fixer Request ID", "Fixer State", "Worker Type (resolved)", "Approval Status", "Scheduled Execution", "Fixer Summary"]
   }
 }

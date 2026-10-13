@@ -1,7 +1,7 @@
 # Fixer Phase 0 Build Specification
-**Surf Crew / Fixer** | Draft v0.1 | October 13, 2026 | Owner: Dave Christy
-**Parent:** [Onboarding and Offboarding Workflow Design](fixer-onboarding-offboarding-workflow-design.md) (v0.1, merged)
-**Status:** build-ready for every item not marked **[BLOCKED ON Q#]**. The Q numbers refer to section 14 of the design doc.
+**Surf Crew / Fixer** | Draft v0.2 | October 13, 2026 | Owner: Dave Christy
+**Parent:** [Onboarding and Offboarding Workflow Design](fixer-onboarding-offboarding-workflow-design.md) (v0.3) and the [Decision Log](decisions.md)
+**Status:** build-ready. v0.2 applies the decisions of October 13, 2026: two paths instead of four, no form changes beyond the Fixer status fields, retention rule, TAP delivery, Business Premium licensing. Remaining open items are listed at the end of the decision log and block Phase 2, not Phase 0.
 
 This document turns the design into the concrete artifacts Phase 0 needs: exact ClickUp fields and IDs, the new fields and forms, the state and audit list schemas, the reference tables, the change set contract, and the catalog of runbooks and flows with their permissions. It is written so a builder can start without re-reading the design doc, and so that nothing is built that the design did not call for.
 
@@ -26,7 +26,7 @@ None of the 44 onboarding fields or 20 offboarding fields is marked required at 
 
 ## 1. Fixer custom fields to add to both lists [DESIGN]
 
-Create these on both lists. Record the generated field IDs in `config/clickup-fields.json` under `fields_to_add`.
+Create these on both lists (Dave Christy owns the forms, Q15). Record the generated field IDs in `config/clickup-fields.json` under `fields_to_add`.
 
 | Field | Type | Options or format | Written by |
 |---|---|---|---|
@@ -41,35 +41,29 @@ Field permissions: hide these fields from the forms so submitters cannot set the
 
 ---
 
-## 2. Form field changes [DESIGN, with concrete definitions]
+## 2. Form changes [DECIDED Q15]
 
-### 2.1 Onboarding list (serves both the New Hire form and the New Contractor form)
+Only the six Fixer status fields in section 1 are added. Dave Christy owns all three forms and adds the fields when the flows are ready. No other fields are added; the New Hire and New Contractor forms feed the same list and are not treated differently.
 
-| Field | Type | Options | Required on | Why |
-|---|---|---|---|---|
-| Worker Type | drop_down | Employee, Contractor | Both forms, hidden and pre-set per form if ClickUp forms allow a default; otherwise the deterministic rule in design 3.3 stays as fallback | Removes the inference |
-| Contract End Date | date | | Contractor form | Enforcement needs a date |
-| Sponsor Email | email | | Contractor form | Approval routing; the Swim USA employee accountable for the contractor |
-| Contracting Company | short_text | | Contractor form | Record only |
-| Additional Apps | labels | Databricks, Claude, ChatGPT, Microsoft 365 Copilot, BlueCherry | Neither (optional) | The in-scope apps that have no field today. BlueCherry also stays selectable in the legacy apps label; Fixer treats either as a request |
-| Credential Delivery Contact | short_text | Personal email or mobile number | Both forms **[BLOCKED ON Q: credential policy, design assumption 8]** | Only add if the policy is to deliver to the person; if delivery goes to the supervisor, skip this field |
+What this means for the build:
 
-**One person per submission.** The New Contractor form should collect one contractor per submission. Until the form is changed, Fixer keeps the split logic (one request per name in **New Contractor(s) Name(s)**) so that existing submissions still work. **[NEW]** Fixer rejects a submission naming more than 5 people as an anomaly and routes it to a human, because a list that long is more likely a bulk project than a form error.
+| Dropped field | How Fixer copes |
+|---|---|
+| Worker Type | Detected from which fields the form populated (design 3.3). Drives OU placement and `employeeType` only; no policy difference anywhere else |
+| Contract End Date, Sponsor Email, Contracting Company | No contractor end-date enforcement. Contractors are offboarded through the same form as employees. The proof pack lists `employeeType=Contractor` accounts with no sign-in in 60 days |
+| Additional Apps | Grant tickets for Databricks, Claude, ChatGPT, and Copilot come only from approver-accepted suggestions extracted from "Any Additional Information". Revoke tickets for all eight apps still fire on every offboarding |
+| Urgency | Cutoff at or before submission time is the immediate path: containment card at once, execute on approval |
+| Confidential | Revoke tickets and app-owner notifications are created **at the cutoff** for every offboarding, never at submission. Approval cards go only to the named approvers |
+| Mailbox Retention | Decided by the form: a value in **Forward Email To** or **Grant Mailbox Access To** means convert to shared; otherwise remove the license and schedule account deletion at T plus 30 (Q7) |
+| Credential Delivery Contact | The supervisor on the form receives the Temporary Access Pass |
 
-### 2.2 Offboarding list
+**Multi-person contractor submissions** keep the split logic: one request per name in **New Contractor(s) Name(s)**; more than 5 names is routed to a human as an anomaly.
 
-| Field | Type | Options | Required | Why |
-|---|---|---|---|---|
-| Worker Type | drop_down | Employee, Contractor | Yes | Routing |
-| Urgency | drop_down | Scheduled, Immediate | Yes | Fast-track path |
-| Confidential | checkbox | | No (default off) | Suppresses tickets and broad notices until cutoff |
-| Mailbox Retention | drop_down | Convert to shared mailbox, No retention needed | Yes | Decides the order of license removal and mailbox conversion |
-| Rename: "Date & Time of Termination (EST)" to "Access cutoff date and time (Eastern)" | date (existing field `dbb44014-...`) | | Yes | Removes the last-day vs cutoff ambiguity. Renaming keeps the field ID, so no code change |
+**Optional, no code impact:** relabel "Date & Time of Termination (EST)" to "Access cutoff date and time (Eastern)". The field ID stays the same. Decided (Q16): the value is the access cutoff.
 
-### 2.3 Form-level settings to verify in the ClickUp UI (not visible by API)
+### 2.1 Form-level settings to confirm in the ClickUp UI (not visible by API)
 
-- Which questions are required on each of the three forms.
-- Whether a form can set a hidden default value for Worker Type.
+- Which questions are required on each of the three forms (question-level Required is available on Business Plus [V]).
 - Whether the forms create exactly one task per submission.
 
 ---
@@ -94,7 +88,7 @@ Field permissions: hide these fields from the forms so submitters cannot set the
 
 | Capability | Plan needed | Fixer impact |
 |---|---|---|
-| API invite, edit, and remove users; invite and remove guests | Enterprise only | On any lower plan, design steps 19 (onboard) and 14 (offboard) become urgent human subtasks. **[BLOCKED ON Q14]** |
+| API invite, edit, and remove users; invite and remove guests | Enterprise only | Workspace is Business Plus (Q14): design steps 19 (onboard) and 14 (offboard) are human subtasks |
 | Native Automation "Call webhook" | Business and above; requests are unsigned, custom headers only | Confirms the API webhook as the primary trigger; native automations are not a secure fallback for a privileged workflow |
 | Form conditional logic | Business Plus and Enterprise | Needed if the forms are to show contractor-only questions conditionally; otherwise keep two separate forms as today |
 | Required form questions | All plans; required Custom Fields at list level are Business and above | Required-ness can be enforced on the form questions themselves |
@@ -180,7 +174,7 @@ Retention: never delete; archive yearly by the owner if the list approaches Shar
 | Sensitive | Yes/No | Sentinel list; never added by Fixer, flagged on offboarding |
 | Aliases | Multi-line text | Names people type in the free-text distro fields; used by the normalizer |
 
-Seed: export with `Get-MgGroup -All -Property displayName,id,onPremisesSyncEnabled,groupTypes,mailEnabled,securityEnabled` and mark FixerManaged and Sensitive by hand. **[BLOCKED ON Q10]** for which groups are license groups.
+Seed: export with `Get-MgGroup -All -Property displayName,id,onPremisesSyncEnabled,groupTypes,mailEnabled,securityEnabled` and mark FixerManaged and Sensitive by hand. Licenses are assigned directly (Q10), so `Kind = LicenseGroup` is unused.
 
 ### 5.2 Division-to-Group map
 
@@ -190,7 +184,7 @@ Seed: export with `Get-MgGroup -All -Property displayName,id,onPremisesSyncEnabl
 | DivisionLabel | Text |
 | GroupNames | Multi-line text (one Group Registry name per line) |
 
-Ten rows, one per division label. Owner fills the group names. **[BLOCKED ON group inventory]**
+Ten rows, one per division label. Owner fills the group names after the Group Registry seed export (P0-6).
 
 ### 5.3 App Owner table
 
@@ -201,9 +195,8 @@ Ten rows, one per division label. Owner fills the group names. **[BLOCKED ON gro
 | BackupClickUpUserId | Number | |
 | GrantSlaHours | Number | Default 24 business hours before the start date |
 | RevokeSlaHours | Number | Default 4 business hours |
-| ContractorAllowed | Choice | Yes, No, SponsorJustification |
 
-**[BLOCKED ON Q4 and Q5]** for owners and contractor policy.
+**Decided (Q4, Q5):** one IT person per app, with overlap; names to follow. No contractor restriction on any app, so there is no `ContractorAllowed` column. Until names are entered, tickets route to the IT list.
 
 ### 5.4 Site Map
 
@@ -213,19 +206,17 @@ Ten rows, one per division label. Owner fills the group names. **[BLOCKED ON gro
 | SiteCode | Text | One code per physical site |
 | PhysicalDeliveryOfficeName | Text | AD attribute value |
 | UsageLocation | Text | ISO 3166 two-letter code |
-| AdOu | Text | Only if OU is per site **[BLOCKED ON Q9]** |
+| AdOu | Text | Not used: OUs are per worker type, not per site (Q9). The three OU paths live in the runbook configuration |
 
 ### 5.5 License SKU map
 
-| Column | Type |
-|---|---|
-| WorkerType | Choice (Employee, Contractor) |
-| SkuPartNumber | Text (for example `SPE_E3`) |
-| SkuId | Text (GUID) |
-| AssignmentMethod | Choice (Direct, Group) |
-| LicenseGroupName | Text (when Group) |
+| Column | Type | Value |
+|---|---|---|
+| SkuPartNumber | Text | `SPB` (Microsoft 365 Business Premium) |
+| SkuId | Text (GUID) | Read from `GET /subscribedSkus` at seed time |
+| AssignmentMethod | Choice | Direct (Q10) |
 
-**[BLOCKED ON Q10 and design assumption 4]**
+One row for everyone (decided A4). Business Premium is capped at 300 users per tenant [U]; the availability check surfaces exhaustion, but confirm headroom before Phase 2. **Verify:** Microsoft 365 admin center, Billing, Licenses.
 
 ---
 
@@ -262,9 +253,9 @@ All runbooks are PowerShell 7, accept a `RequestId`, `StepKey`, and `ChangeSetHa
 | `Fixer-Entra-RemoveLicenses` | Cloud | Remove all licenses | Skip if none | Same |
 | `Fixer-Entra-BlockSignIn` | Cloud | `accountEnabled=false` then `revokeSignInSessions` | Skip if already disabled; always revoke | `User.EnableDisableAccount.All` plus `User.Read.All` (least privileged [V]) and `User.RevokeSessions.All` [V]. A target holding an admin role needs the app to hold a privileged directory role too [V] |
 | `Fixer-Entra-Inventory` | Cloud | Snapshot groups, licenses, roles, devices, mailbox type for the audit and the Sentinel check | Read only | `User.Read.All`, `GroupMember.Read.All`, `RoleManagement.Read.Directory`, `Device.Read.All` |
-| `Fixer-EXO-SetMailboxOffboarding` | Cloud | Auto-reply, forwarding (internal only), full-access delegate, convert to shared if retaining | Compare each setting | Exchange Online app-only with a custom role scoped to mailbox settings. In an Exchange hybrid the conversion must use on-premises `Set-RemoteMailbox -Type Shared` or sync reverts it [V] **[BLOCKED ON Q11]** |
+| `Fixer-EXO-SetMailboxOffboarding` | Cloud | Auto-reply, forwarding (internal only), full-access delegate, convert to shared if retaining | Compare each setting | Exchange Online app-only with a custom role scoped to mailbox settings. An on-prem Exchange server existed and was decommissioned (Q11): P0-2b checks whether mail attributes are still AD-mastered; if so, the conversion and forwarding writes move to the hybrid worker [V] |
 | `Fixer-OneDrive-GrantAccess` | Cloud | Add the named person as site collection admin on the leaver's OneDrive | Skip if present | SharePoint app-only `Sites.FullControl.All` or the SharePoint Online admin role, scoped by policy |
-| `Fixer-Entra-IssueTap` | Cloud | Create a Temporary Access Pass for first sign-in and deliver per policy | Skip if a live TAP exists (one per user [V]) | `UserAuthMethod-TAP.ReadWrite.All` (narrower) or `UserAuthenticationMethod.ReadWrite.All` [V]; the user must be in scope of the TAP authentication method policy [V] **[BLOCKED ON design assumption 8]** |
+| `Fixer-Entra-IssueTap` | Cloud | Create an 8-hour, single-use-off Temporary Access Pass on the start morning and email it to the supervisor from the form (decided A8) | Skip if a live TAP exists (one per user [V]) | `UserAuthMethod-TAP.ReadWrite.All` (narrower) or `UserAuthenticationMethod.ReadWrite.All` [V]; the user must be in scope of the TAP authentication method policy [V] |
 | `Fixer-Canary` | Both | Weekly synthetic onboard and offboard of a test account in a test OU | n/a | Same as above, test OU only |
 
 **Do not grant** `Directory.ReadWrite.All`; every action above has a narrower permission [V].
@@ -275,7 +266,7 @@ These are documented Microsoft behaviors that the runbooks and the orchestrator 
 
 1. **AD disable is the authoritative containment step.** A cloud-side `accountEnabled=false` on a synced user is undone by the next sync cycle if the AD account is still enabled. Containment therefore runs the Entra block first for speed, then the AD disable, and if the AD disable fails the Scheduler re-applies the Entra block every 5 minutes (and re-revokes sessions) until the AD disable succeeds, while the P1 alert stands. The design doc's statement that a failed AD disable leaves the cloud "already closed" is withdrawn.
 2. **`accountExpires` is not honored under password hash sync.** An expired AD account stays active in Entra ID. The contractor end date is enforced by Fixer's scheduled offboarding, never by `accountExpires`. Under pass-through authentication or federation the docs are silent, so the same rule applies.
-3. **Convert to shared before removing the license, and keep the account.** The convert option only exists while the mailbox is licensed; after license removal the data is held 30 days and then deleted (an optional tenant feature, Delicensing Resiliency, adds a further 30 days). A shared mailbox stays anchored to the user object, so an account whose mailbox is retained as shared is **never deleted** at T plus 30; it stays disabled in the Disabled OU and is reviewed at the owner's retention cadence. Shared mailboxes under 50 GB with no archive and no hold need no license.
+3. **Convert to shared before removing the license, and keep the account.** The convert option only exists while the mailbox is licensed; after license removal the data is held 30 days and then deleted (an optional tenant feature, Delicensing Resiliency, adds a further 30 days). A shared mailbox stays anchored to the user object, so an account whose mailbox is retained as shared is **never deleted** at T plus 30; it stays disabled in the Disabled OU and the proof pack lists it yearly. Shared mailboxes under 50 GB with no archive and no hold need no license. **Rule (Q7):** convert to shared only when the form names a forward or a delegate; otherwise remove the license and schedule account deletion at T plus 30 under its own approval.
 4. **Approvals cannot outlive a 30-day flow run.** Any approval that could stay open longer than 30 days (a contractor extension requested early, an onboarding submitted far ahead) uses "Create an approval" plus a separate flow triggered by the approval response in Dataverse, not "Start and wait".
 5. **Sync timing.** Default delta cycle every 30 minutes; `Start-ADSyncSyncCycle -PolicyType Delta` forces one. Revoked sessions take a few minutes to apply; access tokens already issued last up to one hour, which is the worst-case window after containment for applications that do not support continuous access evaluation.
 6. **usageLocation is cloud-set on synced users** and must be set before license assignment. Confirm no sync rule on the Connect server maps usageLocation, because a mapped attribute is overwritten by the next cycle.
@@ -315,19 +306,20 @@ Every `step.*` event carries StepKey, ChangeSetHash, PaRunId, and AutomationJobI
 
 | # | Item | Owner | Depends on |
 |---|---|---|---|
-| P0-1 | Choose and Arc-enable the domain-joined server for the Hybrid Runbook Worker; confirm with Netrio if co-managed | IT | Q13 |
-| P0-2 | Create the Automation account, enable managed identity, grant the Graph application permissions in section 7 with admin consent, create the Exchange Online app-only role | IT | Q8, Q11 |
-| P0-3 | Create AD OUs (Employees, Contractors, Disabled, Fixer-managed groups) or map existing ones; create the Fixer AD service account with delegated rights per section 7; enable AD Recycle Bin if off | IT | Q9 |
-| P0-4 | Confirm Entra Connect sync scope covers the OUs; grant `Fixer-Sync-StartDelta` rights on the Connect server | IT | Q8, Q9 |
-| P0-5 | Create the SharePoint lists in sections 4 and 5 with the stated permissions | Fixer owner | Q1 |
-| P0-6 | Seed Group Registry, Site Map, License SKU map | IT | Q10, group inventory |
-| P0-7 | Fill Division-to-Group map and App Owner table | Business owners | Q4, Q5 |
-| P0-8 | Add the Fixer custom fields (section 1) and the form fields (section 2) in ClickUp; record IDs in `config/clickup-fields.json` | Form owner | Q15, Q16 |
-| P0-9 | Register the two webhooks (section 3) against the Intake flow | Fixer owner | F1 deployed |
+| P0-1 | Netrio change request: Arc-enable the chosen on-prem domain-joined server (name to be picked) and a second one as standby; install the Hybrid Runbook Worker extension; allow outbound HTTPS to Azure Automation | Dave Christy with Netrio | Server name |
+| P0-2 | Create the Automation account, enable managed identity, grant the Graph application permissions in section 7 with admin consent, create the Exchange Online app-only role | IT | |
+| P0-2b | Check a synced mailbox's `msExchRecipientTypeDetails` and `RemoteRecipientType`; decide whether mailbox conversion and forwarding are written in Exchange Online or from AD on the hybrid worker | IT | Q11 answer: decommissioned hybrid |
+| P0-3 | Record the existing Employees, Contractors, and Disabled OU paths; create a Fixer-managed groups OU or map one; create the Fixer AD service account with delegated rights per section 7; enable AD Recycle Bin if off | IT | OU paths |
+| P0-4 | Confirm Entra Connect sync scope covers the three OUs; confirm Connect is 2.2.1.0 or later with the default employeeType rule; confirm no rule maps usageLocation; grant `Fixer-Sync-StartDelta` rights on the Connect server | IT | |
+| P0-5 | Create the SharePoint lists in sections 4 and 5 with the stated permissions | Dave Christy | |
+| P0-6 | Seed Group Registry, Site Map, License SKU map (one row: SPB) | IT | |
+| P0-7 | Fill Division-to-Group map and App Owner table (IT person per app) | Dave Christy | App owner names |
+| P0-8 | Add the six Fixer custom fields (section 1) to both lists; optionally relabel the termination field; record IDs in `config/clickup-fields.json` | Dave Christy | F1 ready to write them |
+| P0-9 | Register the two webhooks (section 3) against the Intake flow | Dave Christy | F1 deployed |
 | P0-10 | Create the Fixer service account for Power Automate and its ClickUp API token (scoped user) | IT | |
-| P0-11 | Audit existing ClickBot automations on both lists in the ClickUp UI; list each one and mark it keep or disable | Form owner | |
+| P0-11 | Audit existing ClickBot automations on both lists in the ClickUp UI; list each one and mark it keep or disable | Dave Christy | |
 | P0-12 | Deploy runbooks in section 7 to a test OU and run `Fixer-AD-CreateUser` then `Fixer-AD-DisableUser` on a test account | IT | P0-1 to P0-4 |
-| P0-13 | Deploy F1, F2, F3 in shadow mode (no runbook jobs, approval cards in preview) and F4, F6 with the late-fire alarm live | Fixer owner | P0-5, P0-8, P0-9 |
-| P0-14 | Add this workflow to Fixer's charter with the owner's sign-off | Fixer owner | Q1 |
+| P0-13 | Deploy F1, F2, F3 in shadow mode (no runbook jobs, approval cards in preview) and F4, F6 with the late-fire alarm live | Dave Christy | P0-5, P0-8, P0-9, and Q2, Q3 for card routing |
+| P0-14 | Add this workflow to Fixer's charter with the owner's sign-off | Dave Christy | |
 
 **Exit criterion for Phase 0 [DESIGN]:** P0-12 passes, and F1 through F4 have processed one real submission from each form in shadow mode with a change set that an IT tech agrees matches what they would have done.
