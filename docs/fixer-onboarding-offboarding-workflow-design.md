@@ -1,6 +1,6 @@
 # Fixer: Onboarding and Offboarding Workflow Design
-**Surf Crew / Fixer** | Draft v0.3 | October 13, 2026 | Owner of this doc: Dave Christy
-**Status:** design draft with decisions applied. Thirteen of the section 14 questions and assumptions were answered on October 13, 2026; the [Decision Log](decisions.md) is authoritative where it and this document differ. v0.2 added the verification appendix (section 15); v0.3 adds section 16 and withdraws the contractor-specific path. Build-level detail lives in the [Phase 0 Build Specification](phase-0-build-spec.md).
+**Surf Crew / Fixer** | Draft v0.4 | October 14, 2026 | Owner of this doc: Dave Christy
+**Status:** design draft with decisions applied. The [Decision Log](decisions.md) is authoritative where it and this document differ. v0.2 added the verification appendix (section 15); v0.3 added section 16 and withdrew the contractor-specific path; v0.4 replaces contractor end dates with supervisor attestation (section 8.3, approved October 14, 2026). Build-level detail lives in the [Phase 0 Build Specification](phase-0-build-spec.md).
 
 **Confidence key.** **[V]** checked against official vendor documentation (learn.microsoft.com, developer.clickup.com, help.clickup.com); the appendix gives the page count per claim, which is the honest measure against your three-source bar since vendor behavior has one authoritative publisher. **[U]** my working knowledge, not verified; each has a "how to verify" note. **[OBS]** observed directly in your ClickUp workspace today. **[V, corrected]** a v0.1 claim the verification overturned.
 
@@ -367,16 +367,31 @@ Rules for the card: plain language, every change listed (no "and 4 more"), dates
 - **Cutoff moved earlier:** containment reschedules to the new time with no new approval (the action is the same, only sooner). **Moved later:** requires re-approval, because access stays open longer.
 - **Confidential terminations:** app tickets, ClickUp comments, and Teams notifications avoid naming the reason; tickets are created at the cutoff, not at submission; the approval card goes only to the named approvers.
 
-### 8.3 Contractor end dates
+### 8.3 Contractor attestation (replaces end dates; approved October 14, 2026)
 
-**Withdrawn October 13, 2026 (Q15):** no end date is captured, so none of this section is built. Kept for the record. The residual control is a proof pack line listing contractor accounts with no sign-in in 60 days.
+**Why not an end date.** Contract end dates are never recorded at Swim USA, so a Contract End Date field would be empty and the control would not exist (Q15). The problem it was meant to solve is real: contractors who finish an engagement and are never offboarded. The two signals that do exist are the supervisor, who knows the engagement ended before IT does, and sign-in activity, which stops when the work stops.
 
-- **Capture:** Contract End Date is required on the contractor form (4.3). Fixer rejects an end date more than 12 months out **[ASSUMPTION]**.
-- **Enforcement:** at onboarding, Fixer writes a **scheduled offboarding** to Fixer Requests for the end date and sets AD `accountExpires` for on-premises logon only; it is **not** a cloud backstop, because password hash sync ignores it [V]. At end minus 10 business days, Fixer comments to the sponsor and creates the offboarding request so approvals happen before the date. At end minus 2 business days, it escalates if neither an extension nor approval exists.
-- **Missing end date** (including today's 17 contractors with none [OBS]): onboarding stays in "Needs Info". For existing contractors, a one-time backfill: Fixer lists active contractor accounts and asks each sponsor for an end date.
-- **Extended:** sponsor submits an extension (a short "Contractor Extension" form **[ASSUMPTION]**, or edits the date on the original task); Fixer requests sponsor plus IT approval, then updates the schedule and `accountExpires`.
-- **Shortened:** becomes the new offboarding time; same re-approval logic as a cutoff moved earlier (no new approval required).
-- **No end-date answer by the end date:** containment still runs at the original end date once approved; if containment isn't approved, the late-fire alarm applies.
+**Rule.** Every contractor account runs on a rolling 90-day clock that only its supervisor can renew. Silence means removal.
+
+| Day | What happens |
+|---|---|
+| 0 | Clock starts when onboarding completes (or at the seed date for existing accounts) |
+| 80 | Teams card to the supervisor: "Is Vivek Singh still working with you? **Keep** / **Done**" |
+| 85, 88 | Reminders if no answer |
+| 90 | No answer: treated as **Done** |
+| Any day | **Dormancy trigger:** no successful sign-in in the last 30 days sends the card now, without waiting for day 80 |
+
+- **Keep** resets the clock to 90 days and writes an audit row with the supervisor's UPN and timestamp.
+- **Done** (or silence at day 90) creates an offboarding task in the ClickUp offboarding list, prefilled with the employee's company email, supervisor, and a cutoff of the next business day at 5:00 PM Eastern, with Fixer as the submitter on the supervisor's behalf. From there it is an ordinary offboarding: HR and IT approve containment, nothing changes without a human approval (7.1). The supervisor can edit the cutoff on the task before approval.
+- **Supervisor resolution:** the AD `manager` attribute, which Fixer writes at onboarding from **Supervisor's Email**; if that account is disabled or missing, the card goes to the Fixer owner, who reassigns it.
+- **Who counts as a contractor:** `employeeType=Contractor` or membership of the Contractors OU (Q9), whichever is present.
+- **Existing contractors:** a one-time seed creates a row for every enabled account in the Contractors OU with a due date 14 days out, staggered over those two weeks so supervisors get one card at a time. This is how the current backlog gets cleaned up.
+- **Sign-in data:** `signInActivity.lastSuccessfulSignInDateTime` through Graph. It needs an Entra ID P1 license, which Microsoft 365 Business Premium includes, and the `AuditLog.Read.All` permission [V]. The property is absent for a user who has never signed in [V]; an account older than 30 days with no value counts as dormant.
+- **Proof pack line:** cards sent, kept, done, expired to Done, overdue, and the oldest unattested contractor account.
+
+**Trade-off, stated plainly.** A supervisor who clicks Keep without thinking defeats the control, the same way they ignore end dates today. The difference is that the lazy path, ignoring the card, now leads to removal, not retention.
+
+**Not in scope:** Entra Access Reviews would do this natively but need Entra ID Governance licensing, which Swim USA does not have; revisit if that changes.
 
 ### 8.4 Missing or invalid data
 
@@ -459,7 +474,7 @@ Rules for the card: plain language, every change listed (no "and 4 more"), dates
 | Identity | Rights |
 |---|---|
 | Power Automate flows (service account or connection) | ClickUp API token (scoped user), start jobs on runbooks (Azure built-in role **Automation Job Operator**, which can create and manage jobs but not edit runbooks [V]), read and write Fixer SharePoint lists. **No Graph write, no AD rights.** |
-| Automation account managed identity (cloud runbooks) | Graph application permissions, least-privileged set [V]: `User.Read.All`, `User.EnableDisableAccount.All` (accountEnabled), `User.ReadUpdate.All` (usageLocation, preferredLanguage), `User.RevokeSessions.All`, `GroupMember.ReadWrite.All`, `LicenseAssignment.ReadWrite.All`, `LicenseAssignment.Read.All` (subscribedSkus), `UserAuthMethod-TAP.ReadWrite.All` if TAP is adopted; Exchange Online app-only access with a scoped role for mailbox settings. Never `Directory.ReadWrite.All`. |
+| Automation account managed identity (cloud runbooks) | Graph application permissions, least-privileged set [V]: `User.Read.All`, `User.EnableDisableAccount.All` (accountEnabled), `User.ReadUpdate.All` (usageLocation, preferredLanguage), `User.RevokeSessions.All`, `GroupMember.ReadWrite.All`, `LicenseAssignment.ReadWrite.All`, `LicenseAssignment.Read.All` (subscribedSkus), `UserAuthMethod-TAP.ReadWrite.All` (TAP delivery), `AuditLog.Read.All` (sign-in activity for contractor attestation; Microsoft's troubleshooting guidance adds read-only `Directory.Read.All` to avoid intermittent license-check errors [V]); Exchange Online app-only access with a scoped role for mailbox settings. Never `Directory.ReadWrite.All`. |
 | Hybrid worker AD service account | Delegated permissions on the Employees, Contractors, and Disabled OUs only: create and disable user, reset password, write specific attributes, modify membership of groups in a "Fixer-managed" OU. **Not** Domain Admin. Rights to run delta sync on the Connect server, or a narrowly scoped scheduled task there. |
 | Sensitive groups | Admin, finance, and privileged groups are **outside** the Fixer-managed OU, so Fixer cannot add anyone to them even if asked |
 
@@ -479,7 +494,7 @@ Rules for the card: plain language, every change listed (no "and 4 more"), dates
 2. **Approvals:** requested, approved, rejected, changes requested, timed out; median and worst approval latency per stage.
 3. **Offboarding timeliness (headline metric):** percentage of containments completed within 15 minutes of cutoff; list of any late ones with cause.
 4. **Outcomes:** complete, partially complete, failed; failures by category; manual interventions.
-5. **Contractors:** active contractors, end dates in the next 30 days, contractors with no end date (target zero).
+5. **Contractors:** active contractor accounts, attestation cards sent, kept, done, expired to Done, overdue, and the oldest unattested account (target: none older than 90 days).
 6. **App tickets:** open by app and age; oldest revoke ticket.
 7. **Evidence sample:** 3 randomly picked completed requests with links to the task, the approval record, and the audit rows, so the owner spot-checks real runs.
 8. **Canary:** a synthetic onboarding and offboarding of a test account in a test OU, run every Sunday night through the full path (with a standing test approver), proving the pipeline works even in a quiet week.
@@ -497,7 +512,7 @@ The pack is the proof: if it doesn't arrive Monday, that alone is an alert.
 | 1. Shadow mode (2 to 4 weeks) | Intake, validation, change set, approval card **in preview only** (no execution); late-fire alarm on real offboardings is **live** | 95 percent of change sets match what techs actually did; zero missed cutoffs unnoticed |
 | 2. Employee onboarding live | Execution with approvals | 10 clean runs; rollback tested on a test account |
 | 3. Offboarding live | Containment and deprovision with approvals; canary weekly | 100 percent containment within 15 minutes of cutoff for 4 weeks |
-| 4. Contractors and end dates | **Withdrawn (Q15).** Replaced by the contractor dormancy line in the weekly proof pack | n/a |
+| 4. Contractor attestation | 90-day supervisor attestation with dormancy trigger (8.3); one-time seed of the Contractors OU | Every contractor account has a supervisor and a due date; first full round completed with every card answered or expired to an offboarding request |
 
 ---
 
@@ -562,6 +577,8 @@ All claims were checked on October 13, 2026 against official vendor pages only: 
 | M12 | Hybrid worker purged after 30 days silent [V] | Confirmed | The worker group is purged after more than 30 days without a ping; re-register to recover. | 2 |
 | M13 | Hybrid revoke steps and timing [V] | Confirmed | Disable in AD, reset password twice, disable in Entra, revoke refresh tokens, disable devices. Revocation takes a few minutes; access tokens last up to one hour. | 3 |
 | M14 | Graph can read assigned licenses and SKU availability | Confirmed | subscribedSkus gives consumedUnits and prepaidUnits.enabled with LicenseAssignment.Read.All; per-user via the assignedLicenses property. | 5 |
+| M15 | Sign-in activity for dormancy needs Entra ID P1 (checked October 14) | Confirmed | `signInActivity` details require an Entra ID P1 or P2 license and `AuditLog.Read.All`; the property is not returned for a user who never signed in; `lastSuccessfulSignInDateTime` available since December 2023. Microsoft's troubleshooting page adds `Directory.Read.All` to avoid intermittent license-check errors. | 4 |
+| M16 | Business Premium includes Entra ID P1 (checked October 14) | Confirmed | "Microsoft Entra ID P1 is included with Microsoft 365 Business Premium." | 3 |
 
 ### 15.2 ClickUp
 
@@ -610,6 +627,13 @@ Microsoft (learn.microsoft.com):
 - [Graph: List subscribedSkus](https://learn.microsoft.com/graph/api/subscribedsku-list)
 - [Graph: List licenseDetails (application not supported)](https://learn.microsoft.com/graph/api/user-list-licensedetails)
 - [Graph permissions reference](https://learn.microsoft.com/graph/permissions-reference)
+- [Graph: user resource (signInActivity license and permission note)](https://learn.microsoft.com/graph/api/resources/user?view=graph-rest-1.0#properties)
+- [Graph: signInActivity resource (lastSuccessfulSignInDateTime)](https://learn.microsoft.com/graph/api/resources/signinactivity?view=graph-rest-1.0)
+- [How to detect and investigate inactive user accounts](https://learn.microsoft.com/entra/identity/monitoring-health/howto-manage-inactive-user-accounts)
+- [Troubleshoot: tenant doesn't have premium license error on sign-in activity queries](https://learn.microsoft.com/troubleshoot/entra/entra-id/users-groups-entra-apis/b2c-or-tenant-premium-license-sign-in-activities)
+- [Microsoft 365 Business Premium security FAQ (Entra ID P1 included)](https://learn.microsoft.com/microsoft-365/admin/security-and-compliance/m365bp-security-faq?view=o365-worldwide#does-microsoft-entra-id-p1-come-with-microsoft-365-business-premium)
+- [Microsoft Entra licensing](https://learn.microsoft.com/entra/fundamentals/licensing#microsoft-entra-licensing-options)
+- [Microsoft Entra service description (plan availability table)](https://learn.microsoft.com/office365/servicedescriptions/azure-active-directory#microsoft-entra-id)
 - [Temporary Access Pass](https://learn.microsoft.com/entra/identity/authentication/howto-authentication-temporary-access-pass)
 - [Entra Connect sync scheduler (30 minutes, Start-ADSyncSyncCycle)](https://learn.microsoft.com/entra/identity/hybrid/connect/how-to-connect-sync-feature-scheduler)
 - [Troubleshoot extension-based Hybrid Runbook Worker (30-day purge)](https://learn.microsoft.com/azure/automation/troubleshoot/extension-based-hybrid-runbook-worker)
@@ -654,7 +678,7 @@ Observed directly: ClickUp lists "📋 New Hire IT Onboarding Form" and "📋 Em
 The decision log holds the answers. What changes in this design:
 
 1. **Two paths, not four.** Worker type is still detected (3.3) and still decides the OU and `employeeType`, but it changes no approval, license, app, or timing rule (Q5, Q15). Read the four-column access matrix in 6.1 as two columns: onboard and offboard.
-2. **No contractor end-date enforcement.** Section 8.3 and build Phase 4 are withdrawn (Q15).
+2. **No contractor end-date enforcement.** Replaced on October 14, 2026 by supervisor attestation (8.3): a rolling 90-day clock the supervisor renews, silence means an offboarding request, and 30 days without a sign-in sends the card early.
 3. **Offboarding urgency** is the cutoff timestamp alone (Q16): at or before submission time means immediate (7.6 applies); later means scheduled.
 4. **No confidential flag.** Revoke tickets and app-owner notifications are created at the cutoff for every offboarding, never at submission (8.2 "Confidential terminations" becomes the default behavior for ticket timing).
 5. **Retention rule** (Q7): a forward or delegate on the form means convert to shared and keep the account disabled; otherwise remove the license and delete the account at T plus 30 under its own approval (6.3 steps 15, 18, 21).
