@@ -1,6 +1,6 @@
 # Fixer Phase 0 Build Specification
-**Surf Crew / Fixer** | Draft v0.2 | October 13, 2026 | Owner: Dave Christy
-**Parent:** [Onboarding and Offboarding Workflow Design](fixer-onboarding-offboarding-workflow-design.md) (v0.3) and the [Decision Log](decisions.md)
+**Surf Crew / Fixer** | Draft v0.3 | October 14, 2026 | Owner: Dave Christy
+**Parent:** [Onboarding and Offboarding Workflow Design](fixer-onboarding-offboarding-workflow-design.md) (v0.4) and the [Decision Log](decisions.md)
 **Status:** build-ready. v0.2 applies the decisions of October 13, 2026: two paths instead of four, no form changes beyond the Fixer status fields, retention rule, TAP delivery, Business Premium licensing. Remaining open items are listed at the end of the decision log and block Phase 2, not Phase 0.
 
 This document turns the design into the concrete artifacts Phase 0 needs: exact ClickUp fields and IDs, the new fields and forms, the state and audit list schemas, the reference tables, the change set contract, and the catalog of runbooks and flows with their permissions. It is written so a builder can start without re-reading the design doc, and so that nothing is built that the design did not call for.
@@ -50,7 +50,7 @@ What this means for the build:
 | Dropped field | How Fixer copes |
 |---|---|
 | Worker Type | Detected from which fields the form populated (design 3.3). Drives OU placement and `employeeType` only; no policy difference anywhere else |
-| Contract End Date, Sponsor Email, Contracting Company | No contractor end-date enforcement. Contractors are offboarded through the same form as employees. The proof pack lists `employeeType=Contractor` accounts with no sign-in in 60 days |
+| Contract End Date, Sponsor Email, Contracting Company | Replaced by **supervisor attestation** (design 8.3, spec 4.3, F10): a rolling 90-day clock the supervisor renews from a Teams card; silence or Done creates an offboarding task; 30 days without a sign-in sends the card early |
 | Additional Apps | Grant tickets for Databricks, Claude, ChatGPT, and Copilot come only from approver-accepted suggestions extracted from "Any Additional Information". Revoke tickets for all eight apps still fire on every offboarding |
 | Urgency | Cutoff at or before submission time is the immediate path: containment card at once, execute on approval |
 | Confidential | Revoke tickets and app-owner notifications are created **at the cutoff** for every offboarding, never at submission. Approval cards go only to the named approvers |
@@ -157,6 +157,25 @@ Site: the same SharePoint site that holds the email triage audit list. Two lists
 
 Retention: never delete; archive yearly by the owner if the list approaches SharePoint's view threshold.
 
+### 4.3 Fixer Contractor Attestations (one row per contractor account)
+
+| Column | Type | Notes |
+|---|---|---|
+| Title | Text | UPN |
+| EntraObjectId | Text, indexed, unique | |
+| AdObjectGuid | Text | |
+| SupervisorUPN | Text | From the AD `manager` attribute; refreshed on every F10 run |
+| ClockStartedAt | Date and time | Onboarding completion, last Keep, or seed date |
+| DueAt | Date and time | ClockStartedAt plus 90 days |
+| LastSuccessfulSignInAt | Date and time | From Graph `signInActivity`; null means never |
+| State | Choice | Active, CardSent, Reminder1, Reminder2, Kept, Done, ExpiredToDone, SupervisorMissing |
+| CardSentAt / RespondedAt | Date and time | |
+| RespondedBy | Text | Supervisor UPN, or `fixer-expiry` |
+| OffboardingTaskId | Text | The ClickUp task F10 created on Done or expiry |
+| Seeded | Yes/No | True for rows created by the one-time seed of the Contractors OU |
+
+Rows are removed when the account's offboarding reaches Complete.
+
 ---
 
 ## 5. Reference tables (SharePoint lists, owner-maintained)
@@ -252,6 +271,7 @@ All runbooks are PowerShell 7, accept a `RequestId`, `StepKey`, and `ChangeSetHa
 | `Fixer-Entra-AssignLicense` | Cloud | Direct assignment or license-group membership | Check the user's `assignedLicenses` property first (the `licenseDetails` endpoint is delegated-only and unusable app-only [V]); available = `prepaidUnits.enabled` minus `consumedUnits` from `subscribedSkus` | `LicenseAssignment.ReadWrite.All` [V] and `LicenseAssignment.Read.All` for `subscribedSkus` [V] |
 | `Fixer-Entra-RemoveLicenses` | Cloud | Remove all licenses | Skip if none | Same |
 | `Fixer-Entra-BlockSignIn` | Cloud | `accountEnabled=false` then `revokeSignInSessions` | Skip if already disabled; always revoke | `User.EnableDisableAccount.All` plus `User.Read.All` (least privileged [V]) and `User.RevokeSessions.All` [V]. A target holding an admin role needs the app to hold a privileged directory role too [V] |
+| `Fixer-Entra-ReadSignInActivity` | Cloud | Read `signInActivity/lastSuccessfulSignInDateTime` for the contractor set in one paged query | Read only | `AuditLog.Read.All` plus `User.Read.All` [V]; add read-only `Directory.Read.All` per Microsoft's troubleshooting note to avoid intermittent license-check errors [V]. Needs Entra ID P1, which Business Premium includes [V] |
 | `Fixer-Entra-Inventory` | Cloud | Snapshot groups, licenses, roles, devices, mailbox type for the audit and the Sentinel check | Read only | `User.Read.All`, `GroupMember.Read.All`, `RoleManagement.Read.Directory`, `Device.Read.All` |
 | `Fixer-EXO-SetMailboxOffboarding` | Cloud | Auto-reply, forwarding (internal only), full-access delegate, convert to shared if retaining | Compare each setting | Exchange Online app-only with a custom role scoped to mailbox settings. An on-prem Exchange server existed and was decommissioned (Q11): P0-2b checks whether mail attributes are still AD-mastered; if so, the conversion and forwarding writes move to the hybrid worker [V] |
 | `Fixer-OneDrive-GrantAccess` | Cloud | Add the named person as site collection admin on the leaver's OneDrive | Skip if present | SharePoint app-only `Sites.FullControl.All` or the SharePoint Online admin role, scoped by policy |
@@ -273,6 +293,7 @@ These are documented Microsoft behaviors that the runbooks and the orchestrator 
 7. **employeeType syncs from AD** only on Connect 2.2.1.0 or later with the default "In from AD - User Common" rule intact; a cloned or customized rule may not include it. Check the rule before relying on it for worker type resolution.
 8. **Hybrid Runbook Worker group is purged after 30 days without a ping.** Keep two workers in the group and alert on the worker ping metric; a cold standby left off needs re-registration.
 9. **No gateway connector writes to AD.** Confirms the Hybrid Runbook Worker choice; the only first-party alternative is Power Automate for desktop on a domain-joined machine, which the design rejects.
+10. **Sign-in activity is absent for never-signed-in users** and for sign-ins before April 2020 [V]. The dormancy rule therefore treats a null value on an account older than 30 days as dormant, and `lastSuccessfulSignInDateTime` is not backfilled before December 2023 [V].
 
 ---
 
@@ -289,6 +310,7 @@ These are documented Microsoft behaviors that the runbooks and the orchestrator 
 | F7 | Weekly Proof Pack | Recurrence, Monday 8:00 AM ET | Compose the nine-part pack from the Audit Log; post to the Fixer Governance task and to the owner in Teams | ClickUp, Teams |
 | F8 | Scheduler Heartbeat Check | Recurrence, hourly | Alert if F4's last heartbeat is older than 20 minutes | Teams |
 | F9 | Canary | Recurrence, Sunday 11:00 PM ET | Run `Fixer-Canary` and record the result for F7 | Audit Log |
+| F10 | Contractor Attestation | Recurrence, daily 7:00 AM ET, plus the Teams card response trigger | For every row in Fixer Contractor Attestations: refresh SupervisorUPN and LastSuccessfulSignInAt; send the card at day 80 or on 30-day dormancy; remind at days 85 and 88; on Keep reset the clock; on Done or day-90 expiry create the offboarding task (employee email, supervisor, requester Fixer-on-behalf-of-supervisor, cutoff next business day 5:00 PM ET) and link it; route to the Fixer owner when the supervisor account is disabled | Attestations list, ClickUp, Teams, Audit Log |
 
 Connection rules: F1 through F9 run under a dedicated Fixer service account's connections. The only Azure connection is "Create job" on the Automation account, with the Automation Job Operator role scoped to the account. No Graph connection and no AD connection exists in Power Automate.
 
@@ -296,7 +318,7 @@ Connection rules: F1 through F9 run under a dedicated Fixer service account's co
 
 ## 9. Audit event taxonomy
 
-`intake.received`, `intake.signature_rejected`, `intake.duplicate_linked`, `validate.passed`, `validate.needs_info`, `extract.completed`, `extract.low_confidence`, `resolve.completed`, `resolve.ambiguous`, `changeset.built`, `changeset.voided`, `approval.requested`, `approval.responded`, `approval.reminder`, `approval.escalated`, `schedule.set`, `schedule.fired`, `schedule.late`, `step.started`, `step.succeeded`, `step.already_done`, `step.failed`, `step.skipped`, `circuit.opened`, `circuit.closed`, `ticket.created`, `ticket.released`, `ticket.cancelled`, `ticket.status_changed`, `status.written`, `alert.raised`, `verify.passed`, `verify.failed`, `canary.result`, `proofpack.posted`.
+`intake.received`, `intake.signature_rejected`, `intake.duplicate_linked`, `validate.passed`, `validate.needs_info`, `extract.completed`, `extract.low_confidence`, `resolve.completed`, `resolve.ambiguous`, `changeset.built`, `changeset.voided`, `approval.requested`, `approval.responded`, `approval.reminder`, `approval.escalated`, `schedule.set`, `schedule.fired`, `schedule.late`, `step.started`, `step.succeeded`, `step.already_done`, `step.failed`, `step.skipped`, `circuit.opened`, `circuit.closed`, `ticket.created`, `ticket.released`, `ticket.cancelled`, `ticket.status_changed`, `status.written`, `alert.raised`, `verify.passed`, `verify.failed`, `canary.result`, `proofpack.posted`, `attest.card_sent`, `attest.reminder`, `attest.kept`, `attest.done`, `attest.expired`, `attest.dormant_triggered`, `attest.supervisor_missing`, `attest.seeded`.
 
 Every `step.*` event carries StepKey, ChangeSetHash, PaRunId, and AutomationJobId when a runbook ran.
 
@@ -320,6 +342,7 @@ Every `step.*` event carries StepKey, ChangeSetHash, PaRunId, and AutomationJobI
 | P0-11 | Audit existing ClickBot automations on both lists in the ClickUp UI; list each one and mark it keep or disable | Dave Christy | |
 | P0-12 | Deploy runbooks in section 7 to a test OU and run `Fixer-AD-CreateUser` then `Fixer-AD-DisableUser` on a test account | IT | P0-1 to P0-4 |
 | P0-13 | Deploy F1, F2, F3 in shadow mode (no runbook jobs, approval cards in preview) and F4, F6 with the late-fire alarm live | Dave Christy | P0-5, P0-8, P0-9, and Q2, Q3 for card routing |
-| P0-14 | Add this workflow to Fixer's charter with the owner's sign-off | Dave Christy | |
+| P0-14 | Add this workflow to Fixer's charter with the owner's sign-off, including contractor attestation | Dave Christy | |
+| P0-15 | Grant `AuditLog.Read.All` (and read-only `Directory.Read.All`) to the Automation identity; create the Fixer Contractor Attestations list; run the one-time seed of enabled accounts in the Contractors OU with due dates staggered over 14 days | IT, Dave Christy | P0-2, P0-5, OU paths |
 
 **Exit criterion for Phase 0 [DESIGN]:** P0-12 passes, and F1 through F4 have processed one real submission from each form in shadow mode with a change set that an IT tech agrees matches what they would have done.
